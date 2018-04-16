@@ -46,6 +46,20 @@ void pybind_pointcloud(py::module &m)
 			return std::string("PointCloud with ") +
 					std::to_string(pcd.points_.size()) + " points.";
 		})
+        .def(py::pickle(
+            [](const PointCloud &pcd) {
+                return py::make_tuple(pcd.points_, pcd.normals_, pcd.colors_);
+            },
+            [](py::tuple t) {
+                if (t.size() != 3)
+                    throw std::runtime_error("Invalid state!");
+                auto pcd = new PointCloud();
+                pcd->points_ = t[0].cast<std::vector<Eigen::Vector3d>>();
+                pcd->normals_ = t[1].cast<std::vector<Eigen::Vector3d>>();
+                pcd->colors_ = t[2].cast<std::vector<Eigen::Vector3d>>();
+                return pcd;
+            }
+        ))
 		.def(py::self + py::self)
 		.def(py::self += py::self)
 		.def("has_points", &PointCloud::HasPoints)

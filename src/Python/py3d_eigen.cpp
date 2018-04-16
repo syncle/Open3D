@@ -68,16 +68,27 @@ void pybind_eigen_vector_of_scalar(py::module &m, const std::string &bind_name)
 	vec.def("__deepcopy__", [](std::vector<Scalar> &v, py::dict &memo) {
 		return std::vector<Scalar>(v);
 	});
-	// We use iterable __init__ by default
-	//vec.def("__init__", [](std::vector<Scalar> &v,
-	//		py::array_t<Scalar, py::array::c_style> b) {
-	//	py::buffer_info info = b.request();
-	//	if (info.format != py::format_descriptor<Scalar>::format() ||
-	//			info.ndim != 1)
-	//		throw std::runtime_error("Incompatible buffer format!");
-	//	new (&v) std::vector<Scalar>(info.shape[0]);
-	//	memcpy(v.data(), info.ptr, sizeof(Scalar) * v.size());
-	//});
+    vec.def(py::pickle(
+        [](const std::vector<Scalar> &v) {
+            return py::make_tuple(v.size(), v);
+        },
+        [](py::tuple t) {
+            auto v = std::vector<Scalar>(t[0].cast<size_t>());
+            auto data = t[1].cast<std::vector<Scalar>>();
+            // memcpy(v.data(), data.data(), v.size());
+            return v;
+        }
+    ));
+	// // We use iterable __init__ by default
+	// vec.def("__init__", [](std::vector<Scalar> &v,
+	// 		py::array_t<Scalar, py::array::c_style> b) {
+	// 	py::buffer_info info = b.request();
+	// 	if (info.format != py::format_descriptor<Scalar>::format() ||
+	// 			info.ndim != 1)
+	// 		throw std::runtime_error("Incompatible buffer format!");
+	// 	new (&v) std::vector<Scalar>(info.shape[0]);
+	// 	memcpy(v.data(), info.ptr, sizeof(Scalar) * v.size());
+	// });
 }
 
 template <typename EigenVector>
@@ -107,6 +118,19 @@ void pybind_eigen_vector_of_vector(py::module &m, const std::string &bind_name,
 			py::dict &memo) {
 		return std::vector<EigenVector>(v);
 	});
+    vec.def(py::pickle(
+        [](const std::vector<EigenVector> &v) {
+            std::vector<Scalar> flattern(sizeof(EigenVector) * v.size());
+            memcpy(flattern.data(), v.data(), sizeof(EigenVector) * v.size());
+            return py::make_tuple(v.size(), flattern);
+        },
+        [](py::tuple t) {
+            auto v = std::vector<EigenVector>(t[0].cast<size_t>());
+            auto data = t[1].cast<std::vector<Scalar>>();
+            memcpy(v.data(), data.data(), sizeof(EigenVector) * v.size());
+            return v;
+        }
+    ));
 	// Bare bones interface
 	// We choose to disable them because they do not support slice indices
 	// such as [:,:]. It is recommanded to convert it to numpy.asarray()
@@ -176,7 +200,7 @@ void pybind_eigen(py::module &m)
 {
 	pybind_eigen_vector_of_scalar<int>(m, "IntVector");
 	pybind_eigen_vector_of_scalar<double>(m, "DoubleVector");
-	pybind_eigen_vector_of_vector<Eigen::Vector3d>(m, "Vector3dVector",
+    pybind_eigen_vector_of_vector<Eigen::Vector3d>(m, "Vector3dVector",
 			"std::vector<Eigen::Vector3d>");
 	pybind_eigen_vector_of_vector<Eigen::Vector3i>(m, "Vector3iVector",
 			"std::vector<Eigen::Vector3i>");
