@@ -54,6 +54,33 @@ void ScalableTSDFVolume::Reset()
 	volume_units_.clear();
 }
 
+void ScalableTSDFVolume::Integrate(const PointCloud &pointcloud)
+{
+	std::unordered_set<Eigen::Vector3i, hash_eigen::hash<Eigen::Vector3i>>
+			touched_volume_units_;
+	for (const auto &point : pointcloud->points_) {
+		auto min_bound = LocateVolumeUnit(point - Eigen::Vector3d(
+				sdf_trunc_, sdf_trunc_, sdf_trunc_));
+		auto max_bound = LocateVolumeUnit(point + Eigen::Vector3d(
+				sdf_trunc_, sdf_trunc_, sdf_trunc_));
+		for (auto x = min_bound(0); x <= max_bound(0); x++) {
+			for (auto y = min_bound(1); y <= max_bound(1); y++) {
+				for (auto z = min_bound(2); z <= max_bound(2); z++) {
+					auto loc = Eigen::Vector3i(x, y, z);
+					if (touched_volume_units_.find(loc) ==
+							touched_volume_units_.end()) {
+						touched_volume_units_.insert(loc);
+						auto volume = OpenVolumeUnit(Eigen::Vector3i(x, y, z));
+						volume->IntegrateWithDepthToCameraDistanceMultiplier(
+								image, intrinsic, extrinsic,
+								*depth2cameradistance);
+					}
+				}
+			}
+		}
+	}
+}
+
 void ScalableTSDFVolume::Integrate(const RGBDImage &image,
 		const PinholeCameraIntrinsic &intrinsic,
 		const Eigen::Matrix4d &extrinsic)

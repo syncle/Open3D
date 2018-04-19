@@ -69,6 +69,7 @@ public:
 
 public:
 	void Reset() override;
+    void Integrate(const PointCloud &pointcloud) override;
 	void Integrate(const RGBDImage &image,
 			const PinholeCameraIntrinsic &intrinsic,
 			const Eigen::Matrix4d &extrinsic) override;
