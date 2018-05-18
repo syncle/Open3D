@@ -28,6 +28,7 @@
 
 #include <cstdlib>
 #include <ctime>
+#include <random>
 
 #include <Core/Utility/Console.h>
 #include <Core/Geometry/PointCloud.h>
@@ -247,7 +248,7 @@ RegistrationResult RegistrationRANSACBasedOnFeatureMatching(
     std::random_device dev;
     std::default_random_engine engine(dev());
     std::uniform_real_distribution<double> uniform_dist(
-            1, (double)source.points_.size());
+            0, (double)source.points_.size());
 
 #ifdef _OPENMP
 #pragma omp for nowait
