@@ -29,6 +29,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <random>
+#include <limits>
 
 #include <Core/Utility/Console.h>
 #include <Core/Geometry/PointCloud.h>
@@ -190,14 +191,18 @@ RegistrationResult RegistrationRANSACBasedOnCorrespondence(
             max_correspondence_distance <= 0.0) {
         return RegistrationResult();
     }
-    std::srand((unsigned int)std::time(0));
     Eigen::Matrix4d transformation;
     CorrespondenceSet ransac_corres(ransac_n);
     RegistrationResult result;
+    std::random_device dev;
+    std::mt19937 engine(dev());
+    std::uniform_int_distribution<int> uniform_dist(
+            0, std::numeric_limits<int>::max());
     for (int itr = 0; itr < criteria.max_iteration_ &&
             itr < criteria.max_validation_; itr++) {
         for (int j = 0; j < ransac_n; j++) {
-            ransac_corres[j] = corres[std::rand() % (int)corres.size()];
+            ransac_corres[j] =
+                    corres[uniform_dist(engine) % (int)corres.size()];
         }
         transformation = estimation.ComputeTransformation(source,
                 target, ransac_corres);
@@ -234,8 +239,7 @@ RegistrationResult RegistrationRANSACBasedOnFeatureMatching(
     RegistrationResult result;
     int total_validation = 0;
     bool finished_validation = false;
-    int num_similar_features = 1;
-    std::vector<std::vector<int>> similar_features(source.points_.size());
+    const int num_similar_features = 1;
 
 #ifdef _OPENMP
 #pragma omp parallel
@@ -245,10 +249,10 @@ RegistrationResult RegistrationRANSACBasedOnFeatureMatching(
     KDTreeFlann kdtree(target);
     KDTreeFlann kdtree_feature(target_feature);
     RegistrationResult result_private;
-    std::random_device dev;
-    std::default_random_engine engine(dev());
-    std::uniform_real_distribution<double> uniform_dist(
-            0, (double)source.points_.size());
+    std::vector<std::vector<int>> similar_features(source.points_.size());
+    thread_local static std::mt19937 engine(std::random_device{}());
+    std::uniform_int_distribution<int> uniform_dist(
+            0, std::numeric_limits<int>::max());
 
 #ifdef _OPENMP
 #pragma omp for nowait
@@ -259,8 +263,8 @@ RegistrationResult RegistrationRANSACBasedOnFeatureMatching(
             std::vector<double> dists(num_similar_features);
             Eigen::Matrix4d transformation;
             for (int j = 0; j < ransac_n; j++) {
-                size_t source_sample_id = (size_t)uniform_dist(engine) %
-                        source.points_.size();
+                int source_sample_id = uniform_dist(engine) %
+                        (int)source.points_.size();
                 if (similar_features[source_sample_id].empty()) {
                     std::vector<int> indices(num_similar_features);
                     kdtree_feature.SearchKNN(Eigen::VectorXd(
@@ -274,11 +278,12 @@ RegistrationResult RegistrationRANSACBasedOnFeatureMatching(
                     }
                 }
                 ransac_corres[j](0) = source_sample_id;
-                if (num_similar_features == 1)
+                if (num_similar_features == 1) {
                     ransac_corres[j](1) = similar_features[source_sample_id][0];
-                else
+                } else {
                     ransac_corres[j](1) = similar_features[source_sample_id]
-                            [std::rand() % num_similar_features];
+                            [uniform_dist(engine) % num_similar_features];
+                }
             }
             bool check = true;
             for (const auto &checker : checkers) {
