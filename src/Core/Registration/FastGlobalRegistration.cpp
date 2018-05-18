@@ -27,6 +27,7 @@
 #include "FastGlobalRegistration.h"
 
 #include <random>
+#include <limits>
 
 #include <Core/Geometry/PointCloud.h>
 #include <Core/Geometry/KDTreeFlann.h>
@@ -131,13 +132,14 @@ std::vector<std::pair<int, int>> AdvancedMatching(
     int i, ncorr = (int)corres_cross.size();
     int number_of_trial = ncorr * 100;
     std::random_device dev;
-    std::default_random_engine engine(dev());
-    std::uniform_real_distribution<double> uniform_dist(0, ncorr);
+    std::mt19937 engine(dev());
+    std::uniform_int_distribution<int> uniform_dist(
+            0, std::numeric_limits<int>::max());
     std::vector<std::pair<int, int>> corres_tuple;
     for (i = 0; i < number_of_trial; i++) {
-        rand0 = (int)uniform_dist(engine) % ncorr;
-        rand1 = (int)uniform_dist(engine) % ncorr;
-        rand2 = (int)uniform_dist(engine) % ncorr;
+        rand0 = uniform_dist(engine) % ncorr;
+        rand1 = uniform_dist(engine) % ncorr;
+        rand2 = uniform_dist(engine) % ncorr;
         idi0 = corres_cross[rand0].first;
         idj0 = corres_cross[rand0].second;
         idi1 = corres_cross[rand1].first;
