@@ -244,15 +244,10 @@ RegistrationResult RegistrationRANSACBasedOnFeatureMatching(
     KDTreeFlann kdtree(target);
     KDTreeFlann kdtree_feature(target_feature);
     RegistrationResult result_private;
-    unsigned int seed_number;
-#ifdef _OPENMP
-        // each thread has different seed_number
-    seed_number = (unsigned int)std::time(0) *
-            (omp_get_thread_num() + 1);
-#else
-    seed_number = (unsigned int)std::time(0);
-#endif
-    std::srand(seed_number);
+    std::random_device dev;
+    std::default_random_engine engine(dev());
+    std::uniform_real_distribution<double> uniform_dist(
+            1, (double)source.points_.size());
 
 #ifdef _OPENMP
 #pragma omp for nowait
@@ -263,7 +258,8 @@ RegistrationResult RegistrationRANSACBasedOnFeatureMatching(
             std::vector<double> dists(num_similar_features);
             Eigen::Matrix4d transformation;
             for (int j = 0; j < ransac_n; j++) {
-                int source_sample_id = std::rand() % (int)source.points_.size();
+                size_t source_sample_id = (size_t)uniform_dist(engine) %
+                        source.points_.size();
                 if (similar_features[source_sample_id].empty()) {
                     std::vector<int> indices(num_similar_features);
                     kdtree_feature.SearchKNN(Eigen::VectorXd(
