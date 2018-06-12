@@ -270,12 +270,7 @@ RegistrationResult RegistrationRANSACBasedOnFeatureMatching(
                     kdtree_feature.SearchKNN(Eigen::VectorXd(
                             source_feature.data_.col(source_sample_id)),
                             num_similar_features, indices, dists);
-#ifdef _OPENMP
-#pragma omp critical
-#endif
-                    {
-                        similar_features[source_sample_id] = indices;
-                    }
+                    similar_features[source_sample_id] = indices;
                 }
                 ransac_corres[j](0) = source_sample_id;
                 if (num_similar_features == 1) {
