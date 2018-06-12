@@ -56,7 +56,7 @@ def execute_global_registration(
             TransformationEstimationPointToPoint(False), 4,
             [CorrespondenceCheckerBasedOnEdgeLength(0.9),
             CorrespondenceCheckerBasedOnDistance(distance_threshold)],
-            RANSACConvergenceCriteria(4000000, 500))
+            RANSACConvergenceCriteria(4000000, 2000))
     return result
 
 def refine_registration(source, target, source_fpfh, target_fpfh, voxel_size):
