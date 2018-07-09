@@ -305,6 +305,9 @@ void NormalizeIntensity(Image &image_s, Image &image_t,
         return;
     }
     double mean_s = 0.0, mean_t = 0.0;
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
     for (int row = 0; row < correspondence.size(); row++) {
         int u_s = correspondence[row](0);
         int v_s = correspondence[row](1);
@@ -329,6 +332,9 @@ std::shared_ptr<Image> PreprocessDepth(
 {
     std::shared_ptr<Image> depth_processed = std::make_shared<Image>();
     *depth_processed = depth_orig;
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
     for (int y = 0; y < depth_processed->height_; y++) {
         for (int x = 0; x < depth_processed->width_; x++) {
             float *p = PointerAt<float>(*depth_processed, x, y);
@@ -369,6 +375,8 @@ std::tuple<std::shared_ptr<RGBDImage>, std::shared_ptr<RGBDImage>>
         const Eigen::Matrix4d &odo_init,
         const OdometryOption &option)
 {
+    Timer timer;
+    timer.Start();
     auto source_gray = FilterImage(source.color_,
             Image::FilterType::Gaussian3);
     auto target_gray = FilterImage(target.color_,
@@ -379,7 +387,10 @@ std::tuple<std::shared_ptr<RGBDImage>, std::shared_ptr<RGBDImage>>
             Image::FilterType::Gaussian3);
     auto target_depth = FilterImage(*target_depth_preprocessed,
             Image::FilterType::Gaussian3);
+    timer.Stop();
+    timer.Print("image filtering");
 
+    timer.Start();
     auto correspondence = ComputeCorrespondence(
             pinhole_camera_intrinsic.intrinsic_matrix_, odo_init,
             *source_depth, *target_depth, option);
@@ -389,10 +400,15 @@ std::tuple<std::shared_ptr<RGBDImage>, std::shared_ptr<RGBDImage>>
         PrintWarning("[InitializeRGBDPair] Bad initial pose\n");
     }
     NormalizeIntensity(*source_gray, *target_gray, *correspondence);
+    timer.Stop();    
+    timer.Print("normalization");
 
+    timer.Start();
     auto source_out = PackRGBDImage(*source_gray, *source_depth);
     auto target_out = PackRGBDImage(*target_gray, *target_depth);
     return std::make_tuple(source_out, target_out);
+    timer.Stop();
+    timer.Print("image filtering");
 }
 
 std::tuple<bool, Eigen::Matrix4d> DoSingleIteration(
@@ -447,6 +463,8 @@ std::tuple<bool, Eigen::Matrix4d> ComputeMultiscale(
         const RGBDOdometryJacobian &jacobian_method,
         const OdometryOption &option)
 {
+    Timer timer;
+    timer.Start();
     std::vector<int> iter_counts = option.iteration_number_per_pyramid_level_;
     int num_levels = (int)iter_counts.size();
 
@@ -463,8 +481,11 @@ std::tuple<bool, Eigen::Matrix4d> ComputeMultiscale(
     std::vector<Eigen::Matrix3d> pyramid_camera_matrix =
             CreateCameraMatrixPyramid(pinhole_camera_intrinsic,
             (int)iter_counts.size());
+    timer.Stop();
+    timer.Print("ComputeMultiscale:: preproc");
 
     for (int level = num_levels - 1; level >= 0; level--) {
+        timer.Start();
         const Eigen::Matrix3d level_camera_matrix = pyramid_camera_matrix[level];
 
         auto source_xyz_level = ConvertDepthImageToXYZImage(
@@ -477,7 +498,11 @@ std::tuple<bool, Eigen::Matrix4d> ComputeMultiscale(
                 target_pyramid_dx[level]->depth_);
         auto target_dy_level = PackRGBDImage(target_pyramid_dy[level]->color_,
                 target_pyramid_dy[level]->depth_);
+        timer.Stop();
+        PrintDebug("level : %d\n", level);
+        timer.Print("ComputeMultiscale:: prepare image\n");
 
+        timer.Start();
         for (int iter = 0; iter < iter_counts[num_levels - level - 1]; iter++) {
             Eigen::Matrix4d curr_odo;
             bool is_success;
@@ -493,6 +518,9 @@ std::tuple<bool, Eigen::Matrix4d> ComputeMultiscale(
                 return std::make_tuple(false, Eigen::Matrix4d::Identity());
             }
         }
+        timer.Stop();
+        PrintDebug("level : %d\n", level);
+        timer.Print("ComputeMultiscale:: after iteration\n");
     }
     return std::make_tuple(true, result_odo);
 }
@@ -502,7 +530,8 @@ std::tuple<bool, Eigen::Matrix4d> ComputeMultiscale(
 std::tuple<bool, Eigen::Matrix4d, Eigen::Matrix6d>
         ComputeRGBDOdometry(const RGBDImage &source, const RGBDImage &target,
         const PinholeCameraIntrinsic &pinhole_camera_intrinsic
-        /*= PinholeCameraIntrinsic()*/,
+        /*= PinholeCameraIntrinsic(
+        PinholeCameraIntrinsicParameters::PrimeSenseDefault)*/,
         const Eigen::Matrix4d &odo_init /*= Eigen::Matrix4d::Identity()*/,
         const RGBDOdometryJacobian &jacobian_method
         /*=RGBDOdometryJacobianFromHybridTerm*/,
@@ -513,28 +542,35 @@ std::tuple<bool, Eigen::Matrix4d, Eigen::Matrix6d>
         return std::make_tuple(false,
                 Eigen::Matrix4d::Identity(), Eigen::Matrix6d::Zero());
     }
-
     std::shared_ptr<RGBDImage> source_processed, target_processed;
-    std::tie(source_processed, target_processed) =
+    {
+        ScopeTimer timer("InitializeRGBDOdometry");
+        std::tie(source_processed, target_processed) =
             InitializeRGBDOdometry(source, target, pinhole_camera_intrinsic,
-            odo_init, option);
-
+                odo_init, option);
+    }
     Eigen::Matrix4d extrinsic;
     bool is_success;
-    std::tie(is_success, extrinsic) = ComputeMultiscale(
+    {
+        ScopeTimer timer("ComputeMultiscale");
+        
+        std::tie(is_success, extrinsic) = ComputeMultiscale(
             *source_processed, *target_processed,
             pinhole_camera_intrinsic, odo_init, jacobian_method, option);
-
-    if (is_success) {
-        Eigen::Matrix4d trans_output = extrinsic;
-        Eigen::MatrixXd info_output = CreateInformationMatrix(extrinsic,
+    }   
+    {
+        ScopeTimer timer("Post processing");
+        if (is_success) {
+            Eigen::Matrix4d trans_output = extrinsic;
+            Eigen::MatrixXd info_output = CreateInformationMatrix(extrinsic,
                 pinhole_camera_intrinsic, source_processed->depth_,
                 target_processed->depth_, option);
-        return std::make_tuple(true, trans_output, info_output);
-    }
-    else {
-        return std::make_tuple(false,
+            return std::make_tuple(true, trans_output, info_output);
+        }
+        else {
+            return std::make_tuple(false,
                 Eigen::Matrix4d::Identity(), Eigen::Matrix6d::Identity());
+        }
     }
 }
 

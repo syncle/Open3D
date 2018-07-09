@@ -5,6 +5,19 @@
 from open3d import *
 import numpy as np
 
+import time
+class Timer(object):
+    def __init__(self, name=None):
+        self.name = name
+
+    def __enter__(self):
+        self.tstart = time.time()
+
+    def __exit__(self, type, value, traceback):
+        if self.name:
+            print('[%s]' % self.name)
+        print('Elapsed: %s' % (time.time() - self.tstart))
+
 if __name__ == "__main__":
     pinhole_camera_intrinsic = read_pinhole_camera_intrinsic(
             "../../TestData/camera.json")
@@ -24,15 +37,16 @@ if __name__ == "__main__":
     option = OdometryOption()
     odo_init = np.identity(4)
     print(option)
-
-    [success_color_term, trans_color_term, info] = compute_rgbd_odometry(
-            source_rgbd_image, target_rgbd_image,
-            pinhole_camera_intrinsic, odo_init,
-            RGBDOdometryJacobianFromColorTerm(), option)
-    [success_hybrid_term, trans_hybrid_term, info] = compute_rgbd_odometry(
-            source_rgbd_image, target_rgbd_image,
-            pinhole_camera_intrinsic, odo_init,
-            RGBDOdometryJacobianFromHybridTerm(), option)
+    with Timer('RGBDOdometryJacobianFromColorTerm'):
+        [success_color_term, trans_color_term, info] = compute_rgbd_odometry(
+                source_rgbd_image, target_rgbd_image,
+                pinhole_camera_intrinsic, odo_init,
+                RGBDOdometryJacobianFromColorTerm(), option)
+    with Timer('RGBDOdometryJacobianFromHybridTerm'):
+        [success_hybrid_term, trans_hybrid_term, info] = compute_rgbd_odometry(
+                source_rgbd_image, target_rgbd_image,
+                pinhole_camera_intrinsic, odo_init,
+                RGBDOdometryJacobianFromHybridTerm(), option)
 
     if success_color_term:
         print("Using RGB-D Odometry")

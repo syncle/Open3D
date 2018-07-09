@@ -45,7 +45,7 @@ class RGBDImage;
 std::tuple<bool, Eigen::Matrix4d, Eigen::Matrix6d>
         ComputeRGBDOdometry(const RGBDImage &source, const RGBDImage &target,
         const PinholeCameraIntrinsic &pinhole_camera_intrinsic =
-        PinholeCameraIntrinsic(),
+        PinholeCameraIntrinsic(PinholeCameraIntrinsicParameters::PrimeSenseDefault),
         const Eigen::Matrix4d &odo_init = Eigen::Matrix4d::Identity(),
         const RGBDOdometryJacobian &jacobian_method =
         RGBDOdometryJacobianFromHybridTerm(),
