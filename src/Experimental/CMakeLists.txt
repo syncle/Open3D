@@ -13,6 +13,7 @@ endmacro(EXPERIMENT)
 
 EXPERIMENT(EvaluateFeatureMatch      ${CMAKE_PROJECT_NAME})
 EXPERIMENT(EvaluatePCDMatch          ${CMAKE_PROJECT_NAME})
+EXPERIMENT(FragmentOptimizer         ${CMAKE_PROJECT_NAME})
 EXPERIMENT(IntegrateRGBD             ${CMAKE_PROJECT_NAME})
 EXPERIMENT(OdometryRGBD              ${CMAKE_PROJECT_NAME})
 EXPERIMENT(TrimMeshBasedOnPointCloud ${CMAKE_PROJECT_NAME})
