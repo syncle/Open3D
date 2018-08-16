@@ -1,4 +1,4 @@
-.. _cplusplus_interface_tutorial:
+.. _cpp_interface_tutorial:
 
 C++ interface
 -------------
@@ -23,8 +23,8 @@ Create C++ project
 
 Let's create a basic C++ project based on CMake and Open3D installed libraries and headers.
 
-1. Get the code from :download:`TestVisualizer.cpp <../../_static/C++/TestVisualizer.cpp>`
-2. Get the CMake config file from :download:`CMakeLists.txt <../../_static/C++/CMakeLists.txt>`
+1. Get the code from :download:`TestVisualizer.cpp <../_static/C++/TestVisualizer.cpp>`
+2. Get the CMake config file from :download:`CMakeLists.txt <../_static/C++/CMakeLists.txt>`
 3. Build the project using the following commands:
 
 .. code-block:: bash
@@ -40,7 +40,7 @@ Highlights
 The following fragment from ``CMakeLists.txt`` shows how to specify hints to CMake when looking for the Open3D installation.
 This technique is required when installing Open3D to a user location rather than to a system wide location.
 
-.. literalinclude:: ../../_static/C++/CMakeLists.txt
+.. literalinclude:: ../_static/C++/CMakeLists.txt
    :language: cmake
    :lineno-start: 5
    :lines: 5
@@ -48,7 +48,7 @@ This technique is required when installing Open3D to a user location rather than
 
 This section of the ``CMakeLists.txt`` specifies the installed Open3D include directories, libraries and library directories.
 
-.. literalinclude:: ../../_static/C++/CMakeLists.txt
+.. literalinclude:: ../_static/C++/CMakeLists.txt
    :language: cmake
    :lineno-start: 21
    :lines: 21-41

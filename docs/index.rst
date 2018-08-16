@@ -16,5 +16,7 @@ Open3D: A Modern Library for 3D Data Processing
   introduction
   getting_started
   compilation
-  tutorial/index
+  tutorial_python/index
+  tutorial_cpp/index
   contribute
+  reference
