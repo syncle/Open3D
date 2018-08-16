@@ -63,7 +63,7 @@ Alternatively, if you want to use Xcode IDE, run:
     cd build-xcode
     cmake -G Xcode ../src -DCMAKE_INSTALL_PREFIX=<open3d_install_directory>
     open Open3D.xcodeproj/
- 
+
 The ``CMAKE_INSTALL_PREFIX`` argument is optional.
 
 Install/uninstall the Open3D libraries, headers and Python module by running:
@@ -145,6 +145,6 @@ It then transforms the RGB-D image into a point cloud, then renders the point cl
     :width: 400px
 
 The Python code is quite straightforward, and the detailed explanation can be found in :ref:`rgbd_redwood`.
-You may further experiment with different tutorials or check out the complete tutorial list in the :ref:`tutorial_index` page.
+You may further experiment with different tutorials or check out the complete tutorial list in the :ref:`tutorial_python_index` page.
 
 .. note:: Open3D's Python tutorial utilizes some external packages: ``numpy``, ``matplotlib``, ``opencv-python``. OpenCV is only used for reconstruction system. Please read util/scripts/install-deps-python.sh for installing these packages.
