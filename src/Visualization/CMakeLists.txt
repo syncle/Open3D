@@ -2,24 +2,24 @@
 file(GLOB SHADER_FILES "Shader/GLSL/*.glsl")
 
 add_custom_command(
-    OUTPUT ${PROJECT_SOURCE_DIR}/Visualization/Shader/Shader.h
+    OUTPUT ${PROJECT_SOURCE_DIR}/src/Visualization/Shader/Shader.h
     COMMAND EncodeShader Shader.h
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/Visualization/Shader/
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/Visualization/Shader/
     DEPENDS ${SHADER_FILES} EncodeShader
 )
 
 foreach(file ${SHADER_FILES})
     add_custom_command(
-        OUTPUT ${PROJECT_SOURCE_DIR}/Visualization/Shader/Shader.h
+        OUTPUT ${PROJECT_SOURCE_DIR}/src/Visualization/Shader/Shader.h
         COMMAND EncodeShader Shader.h ${file}
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/Visualization/Shader/
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/Visualization/Shader/
         DEPENDS ${SHADER_FILES} EncodeShader
         APPEND
     )
 endforeach(file)
 
 add_custom_target(ShaderFileTarget ALL
-                  DEPENDS ${PROJECT_SOURCE_DIR}/Visualization/Shader/Shader.h)
+                  DEPENDS ${PROJECT_SOURCE_DIR}/src/Visualization/Shader/Shader.h)
 set_target_properties(ShaderFileTarget PROPERTIES FOLDER "Custom")
 
 # build
@@ -47,6 +47,6 @@ target_include_directories(Visualization PUBLIC ${VISUALIZATION_INCLUDE_DIRS})
 #install headers
 install(DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}"
         DESTINATION "${CMAKE_INSTALL_PREFIX}/include/${CMAKE_PROJECT_NAME}"
+        PATTERN     "Shader/GLSL" EXCLUDE
         PATTERN     "*.cpp" EXCLUDE
-        PATTERN     "*.txt" EXCLUDE
-        PATTERN     "*.glsl" EXCLUDE)
+        PATTERN     "*.txt" EXCLUDE)
