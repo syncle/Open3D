@@ -1,7 +1,7 @@
 .. _cpp_interface_tutorial:
 
-C++ interface
--------------
+Making custom project
+---------------------
 
 This page explains how to create a CMake based C++ project using the Open3D C++ interface.
 

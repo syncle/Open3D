@@ -1,6 +1,6 @@
-.. _dummy_test:
+.. _image:
 
-Dummy_test
+Image
 -------------------------------------
 
 This tutorial shows how basic geometries are read and written by Open3D.

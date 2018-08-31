@@ -1,6 +1,6 @@
-.. _dummy_experimental:
+.. _file_dialog:
 
-Dummy_experimental
+File Dialog
 -------------------------------------
 
 This tutorial shows how basic geometries are read and written by Open3D.
