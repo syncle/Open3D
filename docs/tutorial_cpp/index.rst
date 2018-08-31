@@ -11,3 +11,5 @@ For the C++ interface see :ref:`cpp_interface_tutorial`.
 .. toctree::
 
   cpp_interface
+  Experimental/index
+  Test/index
