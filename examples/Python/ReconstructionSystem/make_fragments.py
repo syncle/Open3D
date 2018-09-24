@@ -22,9 +22,18 @@ if with_opencv:
 def read_rgbd_image(color_file, depth_file, convert_rgb_to_intensity, config):
     color = read_image(color_file)
     depth = read_image(depth_file)
-    rgbd_image = create_rgbd_image_from_color_and_depth(color, depth,
-            depth_trunc = config["max_depth"],
-            convert_rgb_to_intensity = convert_rgb_to_intensity)
+    if config["depth_map_type"] == "redwood":
+        rgbd_image = create_rgbd_image_from_color_and_depth(color, depth,
+                depth_trunc = config["max_depth"],
+                convert_rgb_to_intensity = convert_rgb_to_intensity)
+    elif config["depth_map_type"] == "sun":
+        rgbd_image = create_rgbd_image_from_sun_format(color, depth,
+                depth_trunc = config["max_depth"],
+                convert_rgb_to_intensity = convert_rgb_to_intensity)
+    elif config["depth_map_type"] == "tum":
+        # issue: should support depth_trunc = config["max_depth"]
+        rgbd_image = create_rgbd_image_from_tum_format(color, depth,
+                convert_rgb_to_intensity = convert_rgb_to_intensity)
     return rgbd_image
 
 
@@ -103,11 +112,8 @@ def integrate_rgb_frames_for_fragment(color_files, depth_files,
         print("Fragment %03d / %03d :: integrate rgbd frame %d (%d of %d)."
                 % (fragment_id, n_fragments-1,
                 i_abs, i+1, len(pose_graph.nodes)))
-        color = read_image(color_files[i_abs])
-        depth = read_image(depth_files[i_abs])
-        rgbd = create_rgbd_image_from_color_and_depth(color, depth,
-                depth_trunc = config["max_depth"],
-                convert_rgb_to_intensity = False)
+        rgbd = read_rgbd_image(
+                color_files[i_abs], depth_files[i_abs], False, config)
         pose = pose_graph.nodes[i].pose
         volume.integrate(rgbd, intrinsic, np.linalg.inv(pose))
     mesh = volume.extract_triangle_mesh()
