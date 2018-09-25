@@ -28,7 +28,6 @@ def read_rgbd_image(color_file, depth_file, convert_rgb_to_intensity, config):
                 convert_rgb_to_intensity = convert_rgb_to_intensity)
     elif config["depth_map_type"] == "sun":
         rgbd_image = create_rgbd_image_from_sun_format(color, depth,
-                depth_trunc = config["max_depth"],
                 convert_rgb_to_intensity = convert_rgb_to_intensity)
     elif config["depth_map_type"] == "tum":
         # issue: should support depth_trunc = config["max_depth"]
