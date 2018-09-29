@@ -1,7 +1,7 @@
 {
     "name": "Open3D reconstruction tutorial http://open3d.org/docs/tutorial/ReconstructionSystem/system_overview.html",
     "path_dataset": "dataset/sun/hotel_graz/",
-    "path_intrinsic": "",
+    "path_intrinsic": "config/sun/camera_sun_533.json",
     "depth_map_type": "sun",
     "max_depth": 3.0,
     "voxel_size": 0.05,
