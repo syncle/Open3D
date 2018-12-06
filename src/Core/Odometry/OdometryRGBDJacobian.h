@@ -27,11 +27,11 @@
 #pragma once
 
 #include <iostream>
-#include <vector>
 #include <tuple>
-#include <Eigen/Core>
-#include <Core/Odometry/OdometryOption.h>
+#include <vector>
+#include <Core/Odometry/OdometryRGBDOption.h>
 #include <Core/Utility/Eigen.h>
+#include <Eigen/Core>
 
 namespace open3d {
 
@@ -42,17 +42,17 @@ class RGBDImage;
 typedef std::vector<Eigen::Vector4i> CorrespondenceSetPixelWise;
 
 /// Base class that computes Jacobian from two RGB-D images
-class RGBDOdometryJacobian
+class OdometryRGBDJacobian
 {
 public:
-    RGBDOdometryJacobian() {}
-    virtual ~RGBDOdometryJacobian() {}
+    OdometryRGBDJacobian() {}
+    virtual ~OdometryRGBDJacobian() {}
 
 public:
     /// Function to compute i-th row of J and r
     /// the vector form of J_r is basically 6x1 matrix, but it can be
     /// easily extendable to 6xn matrix.
-    /// See RGBDOdometryJacobianFromHybridTerm for this case.
+    /// See OdometryRGBDJacobianFromHybridTerm for this case.
     virtual void ComputeJacobianAndResidual(
             int row, std::vector<Eigen::Vector6d> &J_r, std::vector<double> &r,
             const RGBDImage &source, const RGBDImage &target,
@@ -69,11 +69,11 @@ public:
 /// F. Steinbrucker, J. Sturm, and D. Cremers.
 /// Real-time visual odometry from dense RGB-D images.
 /// In ICCV Workshops, 2011.
-class RGBDOdometryJacobianFromColorTerm : public RGBDOdometryJacobian
+class OdometryRGBDJacobianFromColorTerm : public OdometryRGBDJacobian
 {
 public:
-    RGBDOdometryJacobianFromColorTerm() {}
-    ~RGBDOdometryJacobianFromColorTerm() override {}
+    OdometryRGBDJacobianFromColorTerm() {}
+    ~OdometryRGBDJacobianFromColorTerm() override {}
 
 public:
     void ComputeJacobianAndResidual(
@@ -91,11 +91,11 @@ public:
 /// reference:
 /// J. Park, Q.-Y. Zhou, and V. Koltun
 /// anonymous submission
-class RGBDOdometryJacobianFromHybridTerm : public RGBDOdometryJacobian
+class OdometryRGBDJacobianFromHybridTerm : public OdometryRGBDJacobian
 {
 public:
-    RGBDOdometryJacobianFromHybridTerm() {}
-    ~RGBDOdometryJacobianFromHybridTerm() override {}
+    OdometryRGBDJacobianFromHybridTerm() {}
+    ~OdometryRGBDJacobianFromHybridTerm() override {}
 
 public:
     void ComputeJacobianAndResidual(

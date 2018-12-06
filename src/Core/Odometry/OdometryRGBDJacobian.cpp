@@ -24,11 +24,11 @@
 // IN THE SOFTWARE.
 // ----------------------------------------------------------------------------
 
-#include "Odometry.h"
+#include "OdometryRGBD.h"
 
 #include <Core/Geometry/Image.h>
 #include <Core/Geometry/RGBDImage.h>
-#include <Core/Odometry/RGBDOdometryJacobian.h>
+#include <Core/Odometry/OdometryRGBDJacobian.h>
 
 namespace open3d {
 
@@ -39,7 +39,7 @@ const double LAMBDA_HYBRID_DEPTH = 0.968;
 
 }    // unnamed namespace
 
-void RGBDOdometryJacobianFromColorTerm::ComputeJacobianAndResidual(
+void OdometryRGBDJacobianFromColorTerm::ComputeJacobianAndResidual(
         int row, std::vector<Eigen::Vector6d> &J_r, std::vector<double> &r,
         const RGBDImage &source, const RGBDImage &target,
         const Image &source_xyz,
@@ -80,7 +80,7 @@ void RGBDOdometryJacobianFromColorTerm::ComputeJacobianAndResidual(
     r[0] = diff;
 }
 
-void RGBDOdometryJacobianFromHybridTerm::ComputeJacobianAndResidual(
+void OdometryRGBDJacobianFromHybridTerm::ComputeJacobianAndResidual(
         int row, std::vector<Eigen::Vector6d> &J_r, std::vector<double> &r,
         const RGBDImage &source, const RGBDImage &target,
         const Image &source_xyz,

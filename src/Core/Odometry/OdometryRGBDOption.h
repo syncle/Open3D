@@ -30,10 +30,10 @@
 
 namespace open3d {
 
-class OdometryOption
+class OdometryRGBDOption
 {
 public:
-    OdometryOption(
+    OdometryRGBDOption(
             const std::vector<int> &iteration_number_per_pyramid_level =
             { 20, 10, 5 } /* {smaller image size to original image size} */,
             double max_depth_diff = 0.03,
@@ -43,7 +43,7 @@ public:
             (iteration_number_per_pyramid_level),
             max_depth_diff_(max_depth_diff), min_depth_(min_depth),
             max_depth_(max_depth) {}
-    ~OdometryOption() {}
+    ~OdometryRGBDOption() {}
 
 public:
     std::vector<int> iteration_number_per_pyramid_level_;

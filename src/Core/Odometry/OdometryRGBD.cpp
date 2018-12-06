@@ -24,12 +24,12 @@
 // IN THE SOFTWARE.
 // ----------------------------------------------------------------------------
 
-#include "Odometry.h"
+#include "OdometryRGBD.h"
 
 #include <Eigen/Dense>
 #include <Core/Geometry/Image.h>
 #include <Core/Geometry/RGBDImage.h>
-#include <Core/Odometry/RGBDOdometryJacobian.h>
+#include <Core/Odometry/OdometryRGBDJacobian.h>
 #include <Core/Utility/Eigen.h>
 #include <Core/Utility/Timer.h>
 
@@ -113,7 +113,7 @@ std::shared_ptr<CorrespondenceSetPixelWise> ComputeCorrespondence(
         const Eigen::Matrix3d intrinsic_matrix,
         const Eigen::Matrix4d &extrinsic,
         const Image &depth_s, const Image &depth_t,
-        const OdometryOption &option)
+        const OdometryRGBDOption &option)
 {
     const Eigen::Matrix3d K = intrinsic_matrix;
     const Eigen::Matrix3d K_inv = K.inverse();
@@ -240,7 +240,7 @@ Eigen::Matrix6d CreateInformationMatrix(
         const Eigen::Matrix4d &extrinsic,
         const PinholeCameraIntrinsic &pinhole_camera_intrinsic,
         const Image &depth_s, const Image &depth_t,
-        const OdometryOption &option)
+        const OdometryRGBDOption &option)
 {
     auto correspondence = ComputeCorrespondence(
             pinhole_camera_intrinsic.intrinsic_matrix_,
@@ -325,7 +325,7 @@ inline std::shared_ptr<RGBDImage> PackRGBDImage(
 }
 
 std::shared_ptr<Image> PreprocessDepth(
-        const Image &depth_orig, const OdometryOption &option)
+        const Image &depth_orig, const OdometryRGBDOption &option)
 {
     std::shared_ptr<Image> depth_processed = std::make_shared<Image>();
     *depth_processed = depth_orig;
@@ -363,11 +363,11 @@ inline bool CheckRGBDImagePair(const RGBDImage &source, const RGBDImage &target)
 }
 
 std::tuple<std::shared_ptr<RGBDImage>, std::shared_ptr<RGBDImage>>
-        InitializeRGBDOdometry(
+        InitializeOdometryRGBD(
         const RGBDImage &source, const RGBDImage &target,
         const PinholeCameraIntrinsic &pinhole_camera_intrinsic,
         const Eigen::Matrix4d &odo_init,
-        const OdometryOption &option)
+        const OdometryRGBDOption &option)
 {
     auto source_gray = FilterImage(source.color_,
             Image::FilterType::Gaussian3);
@@ -397,8 +397,8 @@ std::tuple<bool, Eigen::Matrix4d> DoSingleIteration(
     const RGBDImage &target_dx, const RGBDImage &target_dy,
     const Eigen::Matrix3d intrinsic,
     const Eigen::Matrix4d &extrinsic_initial,
-    const RGBDOdometryJacobian &jacobian_method,
-    const OdometryOption &option)
+    const OdometryRGBDJacobian &jacobian_method,
+    const OdometryRGBDOption &option)
 {
     auto correspondence = ComputeCorrespondence(
             intrinsic, extrinsic_initial, source.depth_, target.depth_, option);
@@ -421,7 +421,7 @@ std::tuple<bool, Eigen::Matrix4d> DoSingleIteration(
     std::tie(is_success, extrinsic) =
             SolveJacobianSystemAndObtainExtrinsicMatrix(JTJ, JTr);
     if (!is_success) {
-        PrintWarning("[ComputeOdometry] no solution!\n");
+        PrintWarning("[ComputeOdometryRGBD] no solution!\n");
         return std::make_tuple(false, Eigen::Matrix4d::Identity());
     } else {
         return std::make_tuple(true, extrinsic);
@@ -432,8 +432,8 @@ std::tuple<bool, Eigen::Matrix4d> ComputeMultiscale(
         const RGBDImage &source, const RGBDImage &target,
         const PinholeCameraIntrinsic &pinhole_camera_intrinsic,
         const Eigen::Matrix4d &extrinsic_initial,
-        const RGBDOdometryJacobian &jacobian_method,
-        const OdometryOption &option)
+        const OdometryRGBDJacobian &jacobian_method,
+        const OdometryRGBDOption &option)
 {
     std::vector<int> iter_counts = option.iteration_number_per_pyramid_level_;
     int num_levels = (int)iter_counts.size();
@@ -477,7 +477,7 @@ std::tuple<bool, Eigen::Matrix4d> ComputeMultiscale(
             result_odo = curr_odo * result_odo;
 
             if (!is_success) {
-                PrintWarning("[ComputeOdometry] no solution!\n");
+                PrintWarning("[ComputeOdometryRGBD] no solution!\n");
                 return std::make_tuple(false, Eigen::Matrix4d::Identity());
             }
         }
@@ -488,23 +488,23 @@ std::tuple<bool, Eigen::Matrix4d> ComputeMultiscale(
 }    // unnamed namespace
 
 std::tuple<bool, Eigen::Matrix4d, Eigen::Matrix6d>
-        ComputeRGBDOdometry(const RGBDImage &source, const RGBDImage &target,
+        ComputeOdometryRGBD(const RGBDImage &source, const RGBDImage &target,
         const PinholeCameraIntrinsic &pinhole_camera_intrinsic
         /*= PinholeCameraIntrinsic()*/,
         const Eigen::Matrix4d &odo_init /*= Eigen::Matrix4d::Identity()*/,
-        const RGBDOdometryJacobian &jacobian_method
-        /*=RGBDOdometryJacobianFromHybridTerm*/,
-        const OdometryOption &option /*= OdometryOption()*/)
+        const OdometryRGBDJacobian &jacobian_method
+        /*=OdometryRGBDJacobianFromHybridTerm*/,
+        const OdometryRGBDOption &option /*= OdometryRGBDOption()*/)
 {
     if (!CheckRGBDImagePair(source, target)) {
-        PrintError("[RGBDOdometry] Two RGBD pairs should be same in size.\n");
+        PrintError("[OdometryRGBD] Two RGBD pairs should be same in size.\n");
         return std::make_tuple(false,
                 Eigen::Matrix4d::Identity(), Eigen::Matrix6d::Zero());
     }
 
     std::shared_ptr<RGBDImage> source_processed, target_processed;
     std::tie(source_processed, target_processed) =
-            InitializeRGBDOdometry(source, target, pinhole_camera_intrinsic,
+            InitializeOdometryRGBD(source, target, pinhole_camera_intrinsic,
             odo_init, option);
 
     Eigen::Matrix4d extrinsic;

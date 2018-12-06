@@ -48,7 +48,8 @@
 #include "Registration/Registration.h"
 #include "Registration/TransformationEstimation.h"
 
-#include "Odometry/Odometry.h"
+#include "Odometry/OdometryRGBD.h"
+#include "Odometry/OdometryLidar.h"
 
 #include "Integration/TSDFVolume.h"
 #include "Integration/UniformTSDFVolume.h"

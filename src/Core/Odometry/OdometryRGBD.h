@@ -30,10 +30,10 @@
 #include <vector>
 #include <tuple>
 #include <Eigen/Core>
-#include <Core/Utility/Console.h>
-#include <Core/Odometry/OdometryOption.h>
-#include <Core/Odometry/RGBDOdometryJacobian.h>
 #include <Core/Camera/PinholeCameraIntrinsic.h>
+#include <Core/Odometry/OdometryRGBDJacobian.h>
+#include <Core/Odometry/OdometryRGBDOption.h>
+#include <Core/Utility/Console.h>
 #include <Core/Utility/Eigen.h>
 
 namespace open3d {
@@ -43,12 +43,12 @@ class RGBDImage;
 /// Function to estimate 6D odometry between two RGB-D images
 /// output: is_success, 4x4 motion matrix, 6x6 information matrix
 std::tuple<bool, Eigen::Matrix4d, Eigen::Matrix6d>
-        ComputeRGBDOdometry(const RGBDImage &source, const RGBDImage &target,
+        ComputeOdometryRGBD(const RGBDImage &source, const RGBDImage &target,
         const PinholeCameraIntrinsic &pinhole_camera_intrinsic =
         PinholeCameraIntrinsic(),
         const Eigen::Matrix4d &odo_init = Eigen::Matrix4d::Identity(),
-        const RGBDOdometryJacobian &jacobian_method =
-        RGBDOdometryJacobianFromHybridTerm(),
-        const OdometryOption &option = OdometryOption());
+        const OdometryRGBDJacobian &jacobian_method =
+        OdometryRGBDJacobianFromHybridTerm(),
+        const OdometryRGBDOption &option = OdometryRGBDOption());
 
 }    // namespace open3d
