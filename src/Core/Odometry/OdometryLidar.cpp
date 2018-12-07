@@ -31,6 +31,9 @@
 #include <numeric>      // std::iota
 #include <vector>
 #include <Eigen/Dense>
+// #include <Core/Odometry/OdometryLidarOption.h>
+#include <Core/Geometry/KDTreeFlann.h>
+#include <Core/Geometry/PointCloud.h>
 
 namespace open3d {
 
@@ -52,7 +55,7 @@ void ComputeCurvature(const LidarScanLine& scan_line, std::vector<double> &curva
             c_j += (point_j - point_k).norm();
         } 
         c_j /= (s*point_j.norm());
-        curvature.push_back(c_j);
+        curvature.push_back(c_j); // no need to compute curvature using every points
     }
 }
 
@@ -80,7 +83,7 @@ void ComputeAngleAndDiscontinuity(const LidarScanLine& scan_line,
         double norm_surface_grad = surface_grad.norm();
         surface_grad /= norm_surface_grad;               
         angle[i] = surface_grad.dot(scan_direction); // should do absolute?
-        discontinuity[i] = norm_surface_grad;        
+        discontinuity[i] = norm_surface_grad;        // we should only pick OCCLUDED points - should consider minus?
     }
 }
 
@@ -123,10 +126,11 @@ void DetectEdgePlanarFeature(const LidarScanLine& scan_line, const std::vector<d
 }
 
 // Eq (2)
-inline double ComputeEdgeDistance(const LidarScan &source, const LidarScan &target, int line, int i, int j, int l) {
-    auto X_k1_i = target.scan_lines_[line].points_[i];
-    auto X_k_j = source.scan_lines_[line].points_[j];
-    auto X_k_l = source.scan_lines_[line].points_[l];
+inline double ComputeEdgeDistance(const LidarScan &source, int line_i, int i, 
+        const LidarScan &target, int line_j, int j, int line_l, int l) {
+    auto X_k1_i = target.scan_lines_[line_i].points_[i];
+    auto X_k_j = source.scan_lines_[line_j].points_[j];
+    auto X_k_l = source.scan_lines_[line_l].points_[l];
     // add some verification to avoid dividing by zero
     auto temp0 = (X_k1_i-X_k_j).cross(X_k1_i-X_k_l);
     double temp1 = (X_k_j-X_k_l).norm();
@@ -135,20 +139,38 @@ inline double ComputeEdgeDistance(const LidarScan &source, const LidarScan &targ
 }
 
 // Eq (3)
-inline double ComputePlanarPatchDistance(const LidarScan &source, const LidarScan &target, int line, int i, int j, int l, int m) {
-    auto X_k1_i = target.scan_lines_[line].points_[i];
-    auto X_k_j = source.scan_lines_[line].points_[j];
-    auto X_k_l = source.scan_lines_[line].points_[l];
-    auto X_k_m = source.scan_lines_[line].points_[m];
+inline double ComputePlanarPatchDistance(const LidarScan &source, int line_i, int i, 
+        const LidarScan &target, int line_j, int j, int l, int line_m, int m) {
+    auto X_k1_i = target.scan_lines_[line_i].points_[i];
+    auto X_k_j = source.scan_lines_[line_j].points_[j];
+    auto X_k_l = source.scan_lines_[line_j].points_[l];
+    auto X_k_m = source.scan_lines_[line_m].points_[m];
     // add some verification to avoid dividing by zero
     auto temp0 = ((X_k_j-X_k_l).cross(X_k_j-X_k_m));
     auto temp1 = (X_k1_i-X_k_j);
     return temp1.dot(temp0)/temp0.norm();  // point to plane distance. need to check the equation again
 }
 
-// Section V-A
-void ComputeOdometry(const LidarScan &scan, const OdometryLidarOption &option)
+std::shared_ptr<KDTreeFlann> MakeFeatureKDTree(const LidarScanLine &scan_line, const std::vector<int> ind)
 {
+    PointCloud temp_pcd;
+    for (auto point: scan_line.points_) {
+        temp_pcd.points_.push_back(point);
+    }
+    std::shared_ptr<KDTreeFlann> kd_tree;
+    kd_tree->SetGeometry(temp_pcd);
+    return kd_tree;
+}
+
+// Section V-A
+typedef std::vector<std::shared_ptr<KDTreeFlann>> FeatureTree;
+typedef std::vector<std::vector<int>> FeatureIndex;
+typedef std::tuple<FeatureTree, FeatureIndex> LidarFeature;
+std::tuple<LidarFeature, LidarFeature> Preprocessing(const LidarScan &scan, const OdometryLidarOption &option)
+{
+    // line-by-line processing
+    FeatureTree edge_trees, planar_trees;
+    FeatureIndex edge_indices, planar_indices;
     for (int i=0; i<scan.scan_lines_.size(); i++) {
         auto scan_line = scan.scan_lines_[i];
         int s = scan_line.points_.size();
@@ -156,7 +178,100 @@ void ComputeOdometry(const LidarScan &scan, const OdometryLidarOption &option)
         ComputeCurvature(scan_line, curvature);
         std::vector<int> edge, planar;
         DetectEdgePlanarFeature(scan_line, curvature, edge, planar, option);
+        edge_indices.push_back(edge);
+        planar_indices.push_back(planar);
+        edge_trees.push_back(MakeFeatureKDTree(scan_line, edge));
+        planar_trees.push_back(MakeFeatureKDTree(scan_line, planar));
     }
+    auto edge_feature = std::make_tuple(edge_trees, edge_indices);
+    auto planar_feature = std::make_tuple(planar_trees, planar_indices);
+    return std::make_tuple(edge_feature, planar_feature);
+}
+
+enum MatchingMode {
+    EDGE = 0,
+    PLANAR = 1
+};
+void GetMatchingPoints(const FeatureTree &source_tree, const FeatureIndex &source_index, 
+                       const FeatureTree &target_tree, const FeatureIndex &target_index, 
+                       const LidarScan &source, MatchingMode mode)
+{
+    int n_scan_lines = source_tree.size(); // better?
+
+    for (auto line=0; line<n_scan_lines; line++) {
+        auto si_line = source_index[line];
+        for (auto i=0; i<si_line.size(); i++) {
+            // can we do this better using auto tree_scan_line: source_tree_planar?
+            // auto sf_i = source_tree_edge[i];
+            std::vector<int> indices;
+            std::vector<double> distance2;
+            auto query_i = source.scan_lines_[line].points_[si_line[i]];
+            double min_dist = 10000.0;
+            
+            // find the point that is nearest to the point i
+            int min_scan_line_j, min_j, min_m;            
+            for (auto line2=0; line2<n_scan_lines; line2++) {
+                // auto ti_line = target_index_edge[line]; // in global index domain?
+                if (line == line2) // not searching the same line
+                    continue;
+                auto tf_line = target_tree[line2];
+                tf_line->SearchKNN(query_i, 1, indices, distance2);
+                if (distance2[0] < min_dist) {
+                    min_scan_line_j = line2;
+                    min_j = indices[0];
+                    min_dist = distance2[0];
+                }
+            }
+            if (mode == PLANAR) { // pick additional point to make a plane
+                auto tf_line = target_tree[min_scan_line_j];
+                tf_line->SearchKNN(query_i, 1, indices, distance2);
+                min_m = indices[1];
+            } else {
+                min_m = 0;
+            }
+            // find the point l that is one of the two consecutive lines of j
+            min_dist = 10000.0;
+            int min_scan_line_l, min_l;
+            for (auto line3=min_scan_line_j-1; line3<=min_scan_line_j+1; line3++) {
+                if (line3 == min_scan_line_j || line3 < 0 || line3 > n_scan_lines-1)
+                    continue;
+                auto tf_line = target_tree[line3];
+                tf_line->SearchKNN(query_i, 1, indices, distance2);
+                if (distance2[0] < min_dist) {
+                    min_scan_line_l = line3;
+                    min_l = indices[0];
+                    min_dist = distance2[0];
+                }
+            }
+        }   
+    }
+}
+
+void Matching(const LidarFeature &source_feature_edge, const LidarFeature &source_feature_planar, 
+        const LidarFeature &target_feature_edge, const LidarFeature &target_feature_planar, 
+        const LidarScan &source, const LidarScan &target)
+{
+    GetMatchingPoints(std::get<0>(source_feature_edge), std::get<1>(source_feature_edge), 
+                      std::get<0>(target_feature_edge), std::get<1>(target_feature_edge), source, EDGE);
+    GetMatchingPoints(std::get<0>(source_feature_planar), std::get<1>(source_feature_planar), 
+                      std::get<0>(target_feature_planar), std::get<1>(target_feature_planar), source, PLANAR);
+    // // matching planar points
+    
+    // for (auto tree_scan_line: source_tree_planar) {
+        
+    // }
+}
+
+void Execution(const LidarScan &source, const LidarScan &target, const OdometryLidarOption &option)
+{
+    // need to do some warping for source point cloud.
+    auto source_feature = Preprocessing(source, option); // devide preprocessing components - not all components are being used.
+    auto source_feature_edge = std::get<0>(source_feature);
+    auto source_feature_planar = std::get<1>(source_feature);
+    auto target_feature = Preprocessing(target, option);
+    auto target_feature_edge = std::get<0>(target_feature);
+    auto target_feature_planar = std::get<1>(target_feature);
+    Matching(source_feature_edge, source_feature_planar, target_feature_edge, target_feature_planar, source, target);
 }
 
 }   // unnamed namespace

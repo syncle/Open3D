@@ -27,15 +27,12 @@
 #pragma once
 
 #include <tuple>
-// #include <Eigen/Core>
-// 
 #include <Core/Odometry/OdometryLidarOption.h>
-#include <Core/Geometry/KDTreeFlann.h>
 #include <Core/Utility/Eigen.h>
 
 namespace open3d {
 
-class OdometryLidarOption;
+// class OdometryLidarOption;
 
 // class KDTreeFlann;
 
