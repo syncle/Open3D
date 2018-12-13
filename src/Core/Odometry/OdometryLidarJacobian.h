@@ -26,53 +26,17 @@
 
 #pragma once
 
-#include <tuple>
-#include <Core/Odometry/OdometryLidarOption.h>
-#include <Core/Utility/Eigen.h>
+// #include <Core/Odometry/OdometryLidar.h>
+#include "OdometryLidar.h"
 
 namespace open3d {
 
-// class OdometryLidarOption;
+void ComputeJacobianAndResidualForEdgeFeatures(
+    int row, Eigen::Vector6d &J_r, double &r, const LidarScan &source,
+    const LidarScan &target, const std::vector<LiderScanPointCorrespondence> & edge_features);
 
-// class KDTreeFlann;
+void ComputeJacobianAndResidualForPlanarFeatures(
+    int row, Eigen::Vector6d &J_r, double &r, const LidarScan &source,
+    const LidarScan &target, const std::vector<LiderScanPointCorrespondence> &planar_features);
 
-class LidarScanLine {
-public:
-    std::vector<Eigen::Vector3d> points_; // should be the order of the scanning
-    std::vector<Eigen::Vector3d> colors_;
-};
-
-class LidarScan {
-public:
-    std::vector<LidarScanLine> scan_lines_;
-};
-
-class LiderScanPoint {
-public:
-    int scan_line_id_;
-    int vertex_id_;
-};
-
-class LiderScanPointCorrespondence {
-public:
-    LiderScanPoint source_point_;
-    std::vector<LiderScanPoint> target_points_;
-};
-
-// // typedef std::tuple<LiderScanPoint, LiderScanPoint, LiderScanPoint> EdgeFeature;
-// typedef std::tuple<LiderScanPoint, LiderScanPoint, LiderScanPoint,
-//                    LiderScanPoint> PlanarFeature;
-
-// class OdometryLidarOption;
-
-/// Function to estimate 6D odometry between two Lidar scans
-/// output: is_success, 4x4 motion matrix
-/// This is an implementation of the paper
-/// LOAM: Lidar Odometry and Mapping in Real-time,
-/// Ji Zhang and Sanjiv Singh, Robotics: Science and Systems 2014
-std::tuple<bool, Eigen::Matrix4d> ComputeOdometryLidar(
-        const LidarScan &source, const LidarScan &target,
-        const Eigen::Matrix4d &odo_init = Eigen::Matrix4d::Identity(),
-        const OdometryLidarOption &option = OdometryLidarOption());
-
-}    // namespace open3d
+}  // namespace open3d

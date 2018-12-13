@@ -32,8 +32,10 @@
 #include <vector>
 #include <Eigen/Dense>
 // #include <Core/Odometry/OdometryLidarOption.h>
+#include <Core/Odometry/OdometryLidarJacobian.h>
 #include <Core/Geometry/KDTreeFlann.h>
 #include <Core/Geometry/PointCloud.h>
+#include <Core/Utility/Console.h>
 
 namespace open3d {
 
@@ -125,33 +127,8 @@ void DetectEdgePlanarFeature(const LidarScanLine& scan_line, const std::vector<d
     }
 }
 
-// Eq (2)
-inline double ComputeEdgeDistance(const LidarScan &source, int line_i, int i, 
-        const LidarScan &target, int line_j, int j, int line_l, int l) {
-    auto X_k1_i = target.scan_lines_[line_i].points_[i];
-    auto X_k_j = source.scan_lines_[line_j].points_[j];
-    auto X_k_l = source.scan_lines_[line_l].points_[l];
-    // add some verification to avoid dividing by zero
-    auto temp0 = (X_k1_i-X_k_j).cross(X_k1_i-X_k_l);
-    double temp1 = (X_k_j-X_k_l).norm();
-    return temp0.norm()/temp1; // point to line distance
-    // return 0;
-}
-
-// Eq (3)
-inline double ComputePlanarPatchDistance(const LidarScan &source, int line_i, int i, 
-        const LidarScan &target, int line_j, int j, int l, int line_m, int m) {
-    auto X_k1_i = target.scan_lines_[line_i].points_[i];
-    auto X_k_j = source.scan_lines_[line_j].points_[j];
-    auto X_k_l = source.scan_lines_[line_j].points_[l];
-    auto X_k_m = source.scan_lines_[line_m].points_[m];
-    // add some verification to avoid dividing by zero
-    auto temp0 = ((X_k_j-X_k_l).cross(X_k_j-X_k_m));
-    auto temp1 = (X_k1_i-X_k_j);
-    return temp1.dot(temp0)/temp0.norm();  // point to plane distance. need to check the equation again
-}
-
-std::shared_ptr<KDTreeFlann> MakeFeatureKDTree(const LidarScanLine &scan_line, const std::vector<int> ind)
+std::shared_ptr<KDTreeFlann> MakeFeatureKDTree(
+        const LidarScanLine &scan_line, const std::vector<int> ind)
 {
     PointCloud temp_pcd;
     for (auto point: scan_line.points_) {
@@ -192,15 +169,24 @@ enum MatchingMode {
     EDGE = 0,
     PLANAR = 1
 };
-void GetMatchingPoints(const FeatureTree &source_tree, const FeatureIndex &source_index, 
-                       const FeatureTree &target_tree, const FeatureIndex &target_index, 
-                       const LidarScan &source, MatchingMode mode)
-{
-    int n_scan_lines = source_tree.size(); // better?
 
+typedef std::vector<LiderScanPointCorrespondence> Correspondences;
+Correspondences GetMatchingPoints(
+        const FeatureTree &source_tree, const FeatureIndex &source_index, 
+        const FeatureTree &target_tree, const FeatureIndex &target_index, 
+        const LidarScan &source, MatchingMode mode)
+{
+    int n_scan_lines = source_tree.size();  // source_tree is not really necessary. Can we do this better?
+
+    std::vector<LiderScanPointCorrespondence> output;
     for (auto line=0; line<n_scan_lines; line++) {
         auto si_line = source_index[line];
         for (auto i=0; i<si_line.size(); i++) {
+
+            LiderScanPointCorrespondence corr;
+            corr.source_point_.scan_line_id_ = line;
+            corr.source_point_.vertex_id_ = i;
+
             // can we do this better using auto tree_scan_line: source_tree_planar?
             // auto sf_i = source_tree_edge[i];
             std::vector<int> indices;
@@ -209,7 +195,7 @@ void GetMatchingPoints(const FeatureTree &source_tree, const FeatureIndex &sourc
             double min_dist = 10000.0;
             
             // find the point that is nearest to the point i
-            int min_scan_line_j, min_j, min_m;            
+            int min_scan_line_j, min_j, min_scan_line_m, min_m;            
             for (auto line2=0; line2<n_scan_lines; line2++) {
                 // auto ti_line = target_index_edge[line]; // in global index domain?
                 if (line == line2) // not searching the same line
@@ -222,13 +208,10 @@ void GetMatchingPoints(const FeatureTree &source_tree, const FeatureIndex &sourc
                     min_dist = distance2[0];
                 }
             }
-            if (mode == PLANAR) { // pick additional point to make a plane
-                auto tf_line = target_tree[min_scan_line_j];
-                tf_line->SearchKNN(query_i, 1, indices, distance2);
-                min_m = indices[1];
-            } else {
-                min_m = 0;
-            }
+            corr.target_points_.resize(2);
+            corr.target_points_[0].scan_line_id_ = min_scan_line_j;
+            corr.target_points_[0].vertex_id_ = min_j;
+
             // find the point l that is one of the two consecutive lines of j
             min_dist = 10000.0;
             int min_scan_line_l, min_l;
@@ -243,35 +226,80 @@ void GetMatchingPoints(const FeatureTree &source_tree, const FeatureIndex &sourc
                     min_dist = distance2[0];
                 }
             }
+            corr.target_points_[1].scan_line_id_ = min_scan_line_l;
+            corr.target_points_[1].vertex_id_ = min_l;
+
+            if (mode == PLANAR) {  // pick additional point to make a plane
+                auto tf_line = target_tree[min_scan_line_j];
+                tf_line->SearchKNN(query_i, 1, indices, distance2);
+                min_scan_line_m = min_scan_line_j;
+                min_m = indices[1];
+                LiderScanPoint temp;
+                temp.scan_line_id_ = min_scan_line_m;
+                temp.vertex_id_ = min_m;
+                corr.target_points_.push_back(temp);
+            }
+
+            output.push_back(corr);
         }   
     }
+    return std::move(output);
 }
 
-void Matching(const LidarFeature &source_feature_edge, const LidarFeature &source_feature_planar, 
+std::tuple<Correspondences, Correspondences> Matching(
+        const LidarFeature &source_feature_edge, const LidarFeature &source_feature_planar, 
         const LidarFeature &target_feature_edge, const LidarFeature &target_feature_planar, 
         const LidarScan &source, const LidarScan &target)
 {
-    GetMatchingPoints(std::get<0>(source_feature_edge), std::get<1>(source_feature_edge), 
-                      std::get<0>(target_feature_edge), std::get<1>(target_feature_edge), source, EDGE);
-    GetMatchingPoints(std::get<0>(source_feature_planar), std::get<1>(source_feature_planar), 
-                      std::get<0>(target_feature_planar), std::get<1>(target_feature_planar), source, PLANAR);
-    // // matching planar points
-    
-    // for (auto tree_scan_line: source_tree_planar) {
-        
-    // }
+    auto edge_corr = GetMatchingPoints(
+            std::get<0>(source_feature_edge), std::get<1>(source_feature_edge), 
+            std::get<0>(target_feature_edge), std::get<1>(target_feature_edge), source, EDGE);
+    auto planar_corr = GetMatchingPoints(
+            std::get<0>(source_feature_planar), std::get<1>(source_feature_planar),
+            std::get<0>(target_feature_planar), std::get<1>(target_feature_planar),
+            source, PLANAR);
+    return std::make_tuple(edge_corr, planar_corr);
 }
 
-void Execution(const LidarScan &source, const LidarScan &target, const OdometryLidarOption &option)
-{
+std::tuple<bool, Eigen::Matrix4d> Execution(const LidarScan &source,
+                                            const LidarScan &target,
+                                            const OdometryLidarOption &option) {
     // need to do some warping for source point cloud.
     auto source_feature = Preprocessing(source, option); // devide preprocessing components - not all components are being used.
-    auto source_feature_edge = std::get<0>(source_feature);
-    auto source_feature_planar = std::get<1>(source_feature);
     auto target_feature = Preprocessing(target, option);
-    auto target_feature_edge = std::get<0>(target_feature);
-    auto target_feature_planar = std::get<1>(target_feature);
-    Matching(source_feature_edge, source_feature_planar, target_feature_edge, target_feature_planar, source, target);
+    Correspondences edge_corr, planar_corr;
+    std::tie(edge_corr, planar_corr) = Matching(
+            std::get<0>(source_feature), std::get<1>(source_feature),
+            std::get<0>(target_feature), std::get<1>(target_feature), 
+            source, target);
+
+    // retrieve 6D motion
+    auto f_edge = [&](int i, Eigen::Vector6d &J_r, double &r) {
+        ComputeJacobianAndResidualForEdgeFeatures(i, J_r, r, source, target, edge_corr);
+    };
+    auto f_planar = [&](int i, Eigen::Vector6d &J_r, double &r) {
+        ComputeJacobianAndResidualForPlanarFeatures(i, J_r, r, source, target, planar_corr);
+    };
+    // PrintDebug("Iter : %d, Level : %d, ", iter, level);
+    Eigen::Matrix6d JTJ, JTJ_edge, JTJ_planar;
+    Eigen::Vector6d JTr, JTr_edge, JTr_planar;
+    std::tie(JTJ_edge, JTr_edge) = ComputeJTJandJTr<Eigen::Matrix6d, Eigen::Vector6d>(
+            f_edge, edge_corr.size());
+    std::tie(JTJ_planar, JTr_planar) = ComputeJTJandJTr<Eigen::Matrix6d, Eigen::Vector6d>(
+            f_planar, planar_corr.size());
+    JTJ = JTJ_edge + JTJ_planar;
+    JTr = JTr_edge + JTr_planar;
+
+    bool is_success;
+    Eigen::Matrix4d extrinsic;
+    std::tie(is_success, extrinsic) =
+        SolveJacobianSystemAndObtainExtrinsicMatrix(JTJ, JTr);
+    if (!is_success) {
+        PrintWarning("[ComputeOdometryLidar] no solution!\n");
+        return std::make_tuple(false, Eigen::Matrix4d::Identity());
+    } else {
+        return std::make_tuple(true, extrinsic);
+    }
 }
 
 }   // unnamed namespace
@@ -281,7 +309,7 @@ std::tuple<bool, Eigen::Matrix4d> ComputeOdometryLidar(
         const Eigen::Matrix4d &odo_init/* = Eigen::Matrix4d::Identity()*/,
         const OdometryLidarOption &option/* = OdometryLidarOption()*/) 
 {
-    return std::make_tuple(false, Eigen::Matrix4d::Identity());
+    return Execution(source, target, option);
 }
 
 }   // namespace open3d
