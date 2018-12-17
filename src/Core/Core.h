@@ -32,6 +32,9 @@
 #include "Utility/FileSystem.h"
 #include "Utility/Eigen.h"
 
+#include "ColorMap/ColorMapOptimization.h"
+#include "ColorMap/ImageWarpingField.h"
+
 #include "Geometry/Geometry.h"
 #include "Geometry/PointCloud.h"
 #include "Geometry/LineSet.h"
@@ -41,6 +44,7 @@
 #include "Geometry/KDTreeFlann.h"
 
 #include "Camera/PinholeCameraIntrinsic.h"
+#include "Camera/PinholeCameraParameters.h"
 #include "Camera/PinholeCameraTrajectory.h"
 
 #include "Registration/Feature.h"
@@ -52,3 +56,5 @@
 #include "Integration/TSDFVolume.h"
 #include "Integration/UniformTSDFVolume.h"
 #include "Integration/ScalableTSDFVolume.h"
+
+#include "../Open3DConfig.h"

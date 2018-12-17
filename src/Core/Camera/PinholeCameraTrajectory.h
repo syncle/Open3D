@@ -29,29 +29,22 @@
 #include <vector>
 #include <memory>
 
-#include <Core/Camera/PinholeCameraIntrinsic.h>
+#include <Core/Camera/PinholeCameraParameters.h>
 
-namespace three {
+namespace open3d {
 
 class PinholeCameraTrajectory : public IJsonConvertible
 {
 public:
-	PinholeCameraTrajectory();
-	~PinholeCameraTrajectory() override;
+    PinholeCameraTrajectory();
+    ~PinholeCameraTrajectory() override;
 
 public:
-	bool ConvertToJsonValue(Json::Value &value) const override;
-	bool ConvertFromJsonValue(const Json::Value &value) override;
+    bool ConvertToJsonValue(Json::Value &value) const override;
+    bool ConvertFromJsonValue(const Json::Value &value) override;
 
 public:
-	PinholeCameraIntrinsic intrinsic_;
-	std::vector<Eigen::Matrix4d> extrinsic_;
+    std::vector<PinholeCameraParameters> parameters_;
 };
 
-/// Factory function to create a PinholeCameraTrajectory from a file
-/// (PinholeCameraTrajectoryFactory.cpp)
-/// Return an empty PinholeCameraTrajectory if fail to read the file.
-std::shared_ptr<PinholeCameraTrajectory> CreatePinholeCameraTrajectoryFromFile(
-		const std::string &filename);
-
-}	// namespace three
+}    // namespace open3d

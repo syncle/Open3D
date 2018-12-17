@@ -1,49 +1,45 @@
 .. _python_interface_tutorial:
 
 Python interface
--------------------------------------
+----------------
 
-If Open3D is successfully compiled with Python binding, it will create a Python library with name ``py3d``. Typically, you will find a file ``py3d.so`` in ``build/lib`` directory. This tutorial shows how to import ``py3d`` module and print out help information. For trouble shooing, see :ref:`python_binding`.
+Install open3d python package
+=============================
 
-.. code-block:: python
+For installing Open3D python package, see :ref:`install_open3d_python`.
 
-    # src/Python/Tutorial/Basic/python_binding.py
 
-    import numpy as np
+Install open3d from source
+==========================
 
-    def example_help_function():
-        import py3d as py3d
-        help(py3d)
-        help(py3d.PointCloud)
-        help(py3d.read_point_cloud)
+For installing from source, see :ref:`compilation`.
 
-    def example_import_function():
-        from py3d import read_point_cloud
-        pcd = read_point_cloud("../../TestData/ICP/cloud_bin_0.pcd")
-        print(pcd)
+.. _import_open3d_module:
 
-    if __name__ == "__main__":
-        example_help_function()
-        example_import_function()
+Import open3d module
+====================
+
+This tutorial shows how to import ``open3d`` module and print out help information.
+For trouble shooting, see :ref:`compilation_ubuntu_python_binding`.
+
+.. literalinclude:: ../../../examples/Python/Basic/python_binding.py
+   :language: python
+   :lineno-start: 5
+   :lines: 5-
+   :linenos:
 
 This scripts has two functions: ``example_help_function`` and ``example_import_all``
 that show very basic usage of Open3D Python module.
 
-.. note:: Depending on environment, the name of Python library may not ``py3d.so``. Regardless of the file name, ``import py3d`` should work.
+.. note:: Depending on environment, the name of Python library may not be ``open3d.so``. Regardless of the file name, ``import open3d`` should work.
 
-.. _import_py3d_module:
+.. literalinclude:: ../../../examples/Python/Basic/python_binding.py
+   :language: python
+   :lineno-start: 9
+   :lines: 9-12
+   :linenos:
 
-Import py3d module
-=====================================
-
-.. code-block:: python
-
-    def example_import_function():
-        from py3d import read_point_cloud
-        pcd = read_point_cloud("../../TestData/ICP/cloud_bin_0.pcd")
-        print(pcd)
-
-This imports ``read_point_cloud`` function from ``py3d`` module. It reads a point cloud file and returns an instance of ``PointCloud`` class. ``print(pcd)`` prints brief information of the point cloud:
+This imports ``read_point_cloud`` function from ``open3d`` module. It reads a point cloud file and returns an instance of ``PointCloud`` class. ``print(pcd)`` prints brief information of the point cloud:
 
 .. code-block:: sh
 
@@ -53,33 +49,31 @@ This imports ``read_point_cloud`` function from ``py3d`` module. It reads a poin
 .. _using_builtin_help_function:
 
 Using built-in help function
-=====================================
+````````````````````````````
 
 It is recommended to use Python built-in ``help`` function to get definitions and instructions of Open3D functions and classes. For example,
 
-.. code-block:: python
-
-    def example_help_function():
-        import py3d as py3d
-        help(py3d)
-        help(py3d.PointCloud)
-        help(py3d.read_point_cloud)
+.. literalinclude:: ../../../examples/Python/Basic/python_binding.py
+   :language: python
+   :lineno-start: 14
+   :lines: 14-18
+   :linenos:
 
 
-Browse py3d
-``````````````````````````````````````
+Browse open3d
+`````````````
 
-``help(py3d)`` prints documents of ``py3d`` module.
+``help(open3d)`` prints documents of ``open3d`` module.
 
 .. code-block:: sh
 
-    Help on module py3d:
+    Help on module open3d:
 
     NAME
-        py3d - Python binding of Open3D
+        open3d - Python binding of Open3D
 
     FILE
-        /Users/myaccount/Open3D/build/lib/py3d.so
+        /Users/myaccount/Open3D/build/lib/open3d.so
 
     CLASSES
         __builtin__.object
@@ -98,14 +92,14 @@ Browse py3d
     :
 
 
-Description of a class in py3d
-``````````````````````````````````````
+Description of a class in open3d
+````````````````````````````````
 
-``help(py3d.PointCloud)`` provides description of ``PointCloud`` class.
+``help(open3d.PointCloud)`` provides description of ``PointCloud`` class.
 
 .. code-block:: sh
 
-    Help on class PointCloud in module py3d:
+    Help on class PointCloud in module open3d:
 
     class PointCloud(Geometry3D)
      |  Method resolution order:
@@ -117,21 +111,21 @@ Description of a class in py3d
      |  Methods defined here:
      |
      |  __add__(...)
-     |      __add__(self: py3d.PointCloud, arg0: py3d.PointCloud) -> py3d.PointCloud
+     |      __add__(self: open3d.PointCloud, arg0: open3d.PointCloud) -> open3d.PointCloud
      |
     :
 
 
-Description of a function in py3d
-``````````````````````````````````````
+Description of a function in open3d
+```````````````````````````````````
 
-``help(py3d.read_point_cloud)`` provides description of input argument and return type of ``read_point_cloud`` function.
+``help(open3d.read_point_cloud)`` provides description of input argument and return type of ``read_point_cloud`` function.
 
 .. code-block:: sh
 
-    Help on built-in function read_point_cloud in module py3d:
+    Help on built-in function read_point_cloud in module open3d:
 
     read_point_cloud(...)
-        read_point_cloud(filename: unicode) -> py3d.PointCloud
+        read_point_cloud(filename: unicode) -> open3d.PointCloud
 
         Function to read PointCloud from file
