@@ -299,10 +299,6 @@ void ViewControl::RotateWalk(double x, double y) {
     if (yaw_ > 179.0f) yaw_ = 179.0f;
     if (yaw_ < -179.0f) yaw_ = -179.0f;
 
-    PrintInfo("yaw_ : %f\n", yaw_);
-    PrintInfo("pitch_ : %f\n", pitch_);
-
-    // glm::vec3 front;
     front_(0) = std::cos(radians(yaw_)) * std::cos(radians(pitch_));
     front_(1) = std::sin(radians(pitch_));
     front_(2) = std::sin(radians(yaw_)) * std::cos(radians(pitch_));

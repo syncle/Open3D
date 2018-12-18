@@ -187,6 +187,7 @@ protected:
     MouseControl mouse_control_;
     bool is_redraw_required_ = true;
     bool is_initialized_ = false;
+    bool is_walk_mode_ = false;
 
     // view control
     std::unique_ptr<ViewControl> view_control_ptr_;

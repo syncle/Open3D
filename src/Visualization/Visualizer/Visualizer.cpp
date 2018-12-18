@@ -375,9 +375,15 @@ bool Visualizer::HasGeometry() const
 
 void Visualizer::PrintVisualizerHelp()
 {
-    PrintInfo("  -- Mouse view control --\n");
+    PrintInfo("  -- Mouse view control (default mode) --\n");
     PrintInfo("    Left button + drag        : Rotate.\n");
     PrintInfo("    Ctrl + left button + drag : Translate.\n");
+    PrintInfo("    Wheel                     : Zoom in/out.\n");
+    PrintInfo("\n");
+    PrintInfo("  -- Mouse view control (walk mode) --\n");
+    PrintInfo("    W                         : Turn on/off walk mode.\n");
+    PrintInfo("    Mouse movement            : Rotate.\n");
+    PrintInfo("    Left/Right/Up/Down        : Translate.\n");
     PrintInfo("    Wheel                     : Zoom in/out.\n");
     PrintInfo("\n");
     PrintInfo("  -- Keyboard view control --\n");
@@ -398,7 +404,7 @@ void Visualizer::PrintVisualizerHelp()
     PrintInfo("    +/-          : Increase/decrease point size.\n");
     PrintInfo("    N            : Turn on/off point cloud normal rendering.\n");
     PrintInfo("    S            : Toggle between mesh flat shading and smooth shading.\n");
-    PrintInfo("    W            : Turn on/off mesh wireframe.\n");
+    PrintInfo("    F            : Turn on/off mesh wireframe.\n");
     PrintInfo("    B            : Turn on/off back face rendering.\n");
     PrintInfo("    I            : Turn on/off image zoom in interpolation.\n");
     PrintInfo("    T            : Toggle among image render:\n");

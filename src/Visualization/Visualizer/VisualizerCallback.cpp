@@ -48,39 +48,40 @@ void Visualizer::MouseMoveCallback(GLFWwindow *window, double x, double y)
     x /= pixel_to_screen_coordinate_;
     y /= pixel_to_screen_coordinate_;
 #endif
-    if (mouse_control_.is_mouse_left_button_down) {
-        if (mouse_control_.is_control_key_down) {
+    if (!is_walk_mode_) {
+        if (mouse_control_.is_mouse_left_button_down) {
+            if (mouse_control_.is_control_key_down) {
+                view_control_ptr_->Translate(
+                        x - mouse_control_.mouse_position_x,
+                        y - mouse_control_.mouse_position_y,
+                        mouse_control_.mouse_position_x,
+                        mouse_control_.mouse_position_y);
+            } else if (mouse_control_.is_shift_key_down) {
+                view_control_ptr_->Roll(
+                        x - mouse_control_.mouse_position_x);
+            } else {
+                view_control_ptr_->Rotate(
+                        x - mouse_control_.mouse_position_x,
+                        y - mouse_control_.mouse_position_y,
+                        mouse_control_.mouse_position_x,
+                        mouse_control_.mouse_position_y);
+            }
+            is_redraw_required_ = true;
+        }
+        if (mouse_control_.is_mouse_middle_button_down) {
             view_control_ptr_->Translate(
                     x - mouse_control_.mouse_position_x,
                     y - mouse_control_.mouse_position_y,
                     mouse_control_.mouse_position_x,
                     mouse_control_.mouse_position_y);
-        } else if (mouse_control_.is_shift_key_down) {
-            view_control_ptr_->Roll(
-                    x - mouse_control_.mouse_position_x);
-        } else {
-            view_control_ptr_->Rotate(
-                    x - mouse_control_.mouse_position_x,
-                    y - mouse_control_.mouse_position_y,
-                    mouse_control_.mouse_position_x,
-                    mouse_control_.mouse_position_y);
+            is_redraw_required_ = true;
         }
-        is_redraw_required_ = true;
-    }
-    if (mouse_control_.is_mouse_middle_button_down) {
-        view_control_ptr_->Translate(
+    } else {
+        view_control_ptr_->RotateWalk(
                 x - mouse_control_.mouse_position_x,
-                y - mouse_control_.mouse_position_y,
-                mouse_control_.mouse_position_x,
-                mouse_control_.mouse_position_y);
+                y - mouse_control_.mouse_position_y);
         is_redraw_required_ = true;
     }
-    // if (true) { // some mode
-    //     view_control_ptr_->RotateWalk(
-    //             x - mouse_control_.mouse_position_x,
-    //             y - mouse_control_.mouse_position_y);
-    //     is_redraw_required_ = true;
-    // }
     mouse_control_.mouse_position_x = x;
     mouse_control_.mouse_position_y = y;
 }
@@ -208,7 +209,7 @@ void Visualizer::KeyPressCallback(GLFWwindow *window,
                 RenderOption::MeshShadeOption::FlatShade ?
                 "FLAT" : "SMOOTH");
         break;
-    case GLFW_KEY_W:
+    case GLFW_KEY_F:
         render_option_ptr_->ToggleMeshShowWireframe();
         PrintDebug("[Visualizer] Mesh wireframe rendering %s.\n",
                 render_option_ptr_->mesh_show_wireframe_ ? "ON" : "OFF");
@@ -226,21 +227,34 @@ void Visualizer::KeyPressCallback(GLFWwindow *window,
                 RenderOption::TextureInterpolationOption::Nearest ?
                 "NEARST" : "LINEAR");
         break;
+    case GLFW_KEY_W:
+        is_walk_mode_ = !is_walk_mode_;
+        PrintDebug("[Visualizer] Walk mode is %s.\n",
+                is_walk_mode_ ? "ON" : "OFF");
+        break;
     case GLFW_KEY_UP:
-        view_control_ptr_->Walk(key);
-        is_redraw_required_ = true;
+        if (is_walk_mode_) {
+            view_control_ptr_->Walk(key);
+            UpdateGeometry();
+        }
         break;
     case GLFW_KEY_DOWN:
-        view_control_ptr_->Walk(key);
-        is_redraw_required_ = true;
+        if (is_walk_mode_) {
+            view_control_ptr_->Walk(key);
+            UpdateGeometry();
+        }
         break;
     case GLFW_KEY_LEFT:
-        view_control_ptr_->Walk(key);
-        is_redraw_required_ = true;
+        if (is_walk_mode_) {
+            view_control_ptr_->Walk(key);
+            UpdateGeometry();
+        }
         break;
     case GLFW_KEY_RIGHT:
-        view_control_ptr_->Walk(key);
-        is_redraw_required_ = true;
+        if (is_walk_mode_) {
+            view_control_ptr_->Walk(key);
+            UpdateGeometry();
+        }
         break;
     case GLFW_KEY_T:
         render_option_ptr_->ToggleImageStretchOption();
