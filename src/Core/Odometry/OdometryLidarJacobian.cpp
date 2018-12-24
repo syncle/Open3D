@@ -28,6 +28,7 @@
 
 #include <vector>
 #include <tuple>
+#include <Eigen/Dense>
 
 namespace open3d {
 
@@ -76,7 +77,7 @@ void ComputeJacobianAndResidualForEdgeFeatures(int row, Eigen::Vector6d &J_r,
     dxi_dT(2, 1) = -X_i(0);
     dxi_dT(2, 5) = 1.0;  // this matrix can be reused. How this is defined in
                          // other examples?
-    J_r = 1 / temp1 * f * dx_dxi * dxi_dT;
+    J_r = (1 / temp1) * f.transpose() * dx_dxi * dxi_dT;
     r = temp0.norm() / temp1;  // point to line distance, relative contribution based on rotation angle.
 }
 
@@ -123,7 +124,7 @@ void ComputeJacobianAndResidualForPlanarFeatures(
     dxi_dT(2, 1) = -X_i(0);
     dxi_dT(2, 5) = 1.0;  // this matrix can be reused. How this is defined in
                          // other examples?
-    J_r = temp0 * dxi_dT;
+    J_r = temp0.transpose() * dxi_dT;
     // r = temp0.norm() / temp1;  // point to point distance, relative contribution
                                // based on rotation angle.
 }
