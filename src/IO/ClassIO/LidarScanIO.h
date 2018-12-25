@@ -24,29 +24,14 @@
 // IN THE SOFTWARE.
 // ----------------------------------------------------------------------------
 
-#pragma once
-
-#include <tuple>
-#include <Core/Geometry/LidarScan.h>
-#include <Core/Odometry/OdometryLidarOption.h>
-#include <Core/Utility/Eigen.h>
+#include <string>
 
 namespace open3d {
 
-class LiderScanPointCorrespondence {
-public:
-    LiderScanPoint source_point_;
-    std::vector<LiderScanPoint> target_points_;
-};
+class LidarScan;
 
-/// Function to estimate 6D odometry between two Lidar scans
-/// output: is_success, 4x4 motion matrix
-/// This is an implementation of the paper
-/// LOAM: Lidar Odometry and Mapping in Real-time,
-/// Ji Zhang and Sanjiv Singh, Robotics: Science and Systems 2014
-std::tuple<bool, Eigen::Matrix4d> ComputeOdometryLidar(
-        const LidarScan &source, const LidarScan &target,
-        const Eigen::Matrix4d &odo_init = Eigen::Matrix4d::Identity(),
-        const OdometryLidarOption &option = OdometryLidarOption());
+/// https://www.mrt.kit.edu/z/publ/download/velodyneslam/dataset.html
+std::shared_ptr<LidarScan> ReadLidarScanFromKITFormat(
+        const std::string &filename);
 
-}    // namespace open3d
+}

@@ -24,29 +24,50 @@
 // IN THE SOFTWARE.
 // ----------------------------------------------------------------------------
 
-#pragma once
+#include "LidarScan.h"
 
-#include <tuple>
-#include <Core/Geometry/LidarScan.h>
-#include <Core/Odometry/OdometryLidarOption.h>
-#include <Core/Utility/Eigen.h>
+// #include <Eigen/Dense>
+// #include <Core/Utility/Console.h>
+// #include <Core/Geometry/KDTreeFlann.h>
+#include <Core/Geometry/PointCloud.h>
 
-namespace open3d {
+namespace open3d{
 
-class LiderScanPointCorrespondence {
-public:
-    LiderScanPoint source_point_;
-    std::vector<LiderScanPoint> target_points_;
-};
+void LidarScan::Clear()
+{
+    scan_lines_.clear();
+}
 
-/// Function to estimate 6D odometry between two Lidar scans
-/// output: is_success, 4x4 motion matrix
-/// This is an implementation of the paper
-/// LOAM: Lidar Odometry and Mapping in Real-time,
-/// Ji Zhang and Sanjiv Singh, Robotics: Science and Systems 2014
-std::tuple<bool, Eigen::Matrix4d> ComputeOdometryLidar(
-        const LidarScan &source, const LidarScan &target,
-        const Eigen::Matrix4d &odo_init = Eigen::Matrix4d::Identity(),
-        const OdometryLidarOption &option = OdometryLidarOption());
+bool LidarScan::IsEmpty() // const?
+{
+    // return !HasPoints();
+    return true;
+}
+
+bool LidarScan::UndistortScan(Eigen::Matrix4d T /*=Eigen::Matrix4d::Identity()*/) {
+    Eigen::Matrix3d R = T.block<3, 3>(0, 0);
+    Eigen::Vector3d t = T.block<3, 1>(0, 3);
+    for (auto line : scan_lines_) {
+        for (int i = 0; i < line.points_per_line_; i++) {
+            double ratio = double(i) / (line.points_per_line_ - 1);
+            // linear motion model
+            line.points_[i] = ratio * R * line.points_[i] + ratio * t;
+        }
+    }
+    return true;
+}
+
+std::shared_ptr<PointCloud> CreatePointCloudFromLidarScan(
+        const LidarScan& scan)
+{
+    auto pcd = std::make_shared<PointCloud>();
+    for (auto line : scan.scan_lines_) {
+        for (int i=0; i<line.points_per_line_; i++) {
+            auto p = line.points_[i];
+            pcd->points_.push_back(p);
+        }
+    }
+    return pcd;
+}
 
 }    // namespace open3d

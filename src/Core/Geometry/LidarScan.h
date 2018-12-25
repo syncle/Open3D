@@ -24,13 +24,38 @@
 // IN THE SOFTWARE.
 // ----------------------------------------------------------------------------
 
-#include <string>
+#pragma once
+
+#include <vector>
+#include <memory>
+#include <Core/Geometry/Geometry3D.h>
 
 namespace open3d {
 
-class LidarScan;
+class PointCloud;
 
-/// https://www.mrt.kit.edu/z/publ/download/velodyneslam/dataset.html
-std::shared_ptr<LidarScan> ReadLidarScan(const std::string &filename,
-                                         LidarScan &trajectory);
-}
+class LidarScanLine {
+public:
+    int points_per_line_;
+    std::vector<Eigen::Vector3d> points_; // should be the order of the scanning
+    std::vector<Eigen::Vector3d> colors_;
+};
+
+class LidarScan {
+public:
+    std::vector<LidarScanLine> scan_lines_;
+public:
+    void Clear();
+    bool IsEmpty();
+    bool UndistortScan(Eigen::Matrix4d T = Eigen::Matrix4d::Identity());
+};
+
+class LiderScanPoint {
+public:
+    int scan_line_id_;
+    int vertex_id_;
+};
+
+std::shared_ptr<PointCloud> CreatePointCloudFromLidarScan(const LidarScan& scan);
+
+}   // namespace open3d

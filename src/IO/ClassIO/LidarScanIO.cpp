@@ -24,14 +24,12 @@
 // IN THE SOFTWARE.
 // ----------------------------------------------------------------------------
 
-#include "LidarScan.h"
+#include "LidarScanIO.h"
 
 #include <math.h>
-#include <Core/Geometry/Image.h>
 #include <Core/Geometry/LidarScan.h>
 #include <IO/ClassIO/ImageIO.h>
-
-// #define M_PI 3.14159265358979323846
+#include <Core/Utility/Console.h>
 
 namespace open3d {
 
@@ -57,21 +55,23 @@ inline double radian(double input)
 }   // unnamed namespace
 
 std::shared_ptr<LidarScan> ReadLidarScanFromKITFormat(
-    const std::string &depth_filename, LidarScan &trajectory) {
+        const std::string &depth_filename) {
     // read depth image
     auto scan = std::make_shared<LidarScan>();
-    auto depth = CreateImageFromFile("depth_filename");
+    auto depth = CreateImageFromFile(depth_filename);
     // std::assert(depth.height_ != 64);
     double scale = -360.0 / depth->width_;
-    for (int i = 0; i < depth->height_; i++) {
+    for (int v = 0; v < depth->height_; v++) {
         LidarScanLine line;
-        for (int j = 0; j < depth->width_; j++) {
-            float d = *PointerAt<unsigned short>(*depth, j, i);
-            float theta = radian(double(j) * scale + 180);
-            float rho = radian(velodyne_hd64_vertical[i]); // not necessary
+        line.points_per_line_ = depth->width_;
+        for (int u = 0; u < depth->width_; u++) {
+            float d = float(*PointerAt<unsigned short>(*depth, u, v)) / 500.0f;
+            float theta = radian(double(u) * scale + 180.0);
+            float rho = radian(90.0 - velodyne_hd64_vertical[v]); // not necessary
             float x = d * std::sin(rho) * std::cos(theta);
             float y = d * std::sin(rho) * std::sin(theta);
             float z = d * std::cos(rho);
+            // PrintDebug("%f, %f, %f\n", x, y, z);
             Eigen::Vector3d p;
             p << x, y, z;
             line.points_.push_back(p);
