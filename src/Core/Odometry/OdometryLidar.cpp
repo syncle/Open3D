@@ -282,8 +282,7 @@ Correspondences GetMatchingPoints(
     std::vector<LiderScanPointCorrespondence> output;
     for (auto line=0; line<n_scan_lines; line++) {
         auto si_line = source_index[line];
-        for (auto i=0; i<si_line.size(); i++) {
-
+        for (auto i: si_line) {
             LiderScanPointCorrespondence corr;
             corr.source_point_.scan_line_id_ = line;
             corr.source_point_.vertex_id_ = i;
@@ -292,7 +291,7 @@ Correspondences GetMatchingPoints(
             // auto sf_i = source_tree_edge[i];
             std::vector<int> indices;
             std::vector<double> distance2;
-            auto query_i = source.scan_lines_[line].points_[si_line[i]];
+            auto query_i = source.scan_lines_[line].points_[i];
             double min_dist = 10000.0;
             
             // find the point that is nearest to the point i
@@ -302,10 +301,12 @@ Correspondences GetMatchingPoints(
                 // if (line == line2) // not searching the same line - this is target line
                 //     continue;
                 auto tf_line = target_tree[line2];
-                tf_line->SearchKNN(query_i, 1, indices, distance2);
+                int k = tf_line->SearchKNN(query_i, 1, indices, distance2);
+                if (k == 0)
+                    continue;
                 if (distance2[0] < min_dist) {
                     min_scan_line_j = line2;
-                    min_j = source_index[line2][indices[0]];
+                    min_j = target_index[line2][indices[0]];
                     min_dist = distance2[0];
                 }
             }
@@ -320,10 +321,12 @@ Correspondences GetMatchingPoints(
                 if (line3 == min_scan_line_j || line3 < 0 || line3 > n_scan_lines-1)
                     continue;
                 auto tf_line = target_tree[line3];
-                tf_line->SearchKNN(query_i, 1, indices, distance2);
+                int k = tf_line->SearchKNN(query_i, 1, indices, distance2);
+                if (k == 0)
+                    continue;
                 if (distance2[0] < min_dist) {
                     min_scan_line_l = line3;
-                    min_l = source_index[line3][indices[0]];
+                    min_l = target_index[line3][indices[0]];
                     min_dist = distance2[0];
                 }
             }
@@ -333,9 +336,11 @@ Correspondences GetMatchingPoints(
             int min_scan_line_m = 0, min_m = 0;
             if (mode == PLANAR) {  // pick additional point to make a plane
                 auto tf_line = target_tree[min_scan_line_j];
-                tf_line->SearchKNN(query_i, 2, indices, distance2);
+                int k = tf_line->SearchKNN(query_i, 2, indices, distance2);
+                if (k == 0)
+                    continue;
                 min_scan_line_m = min_scan_line_j;
-                min_m = source_index[min_scan_line_j][indices[1]];
+                min_m = target_index[min_scan_line_j][indices[1]];
                 LiderScanPoint temp;
                 temp.scan_line_id_ = min_scan_line_m;
                 temp.vertex_id_ = min_m;
@@ -345,6 +350,23 @@ Correspondences GetMatchingPoints(
         }
     }
     return std::move(output);
+}
+
+void save_corr_for_debugging(const Correspondences &corr,
+                             const char *file_name) {
+    PrintError("save_corr_for_debugging\n");
+    std::ofstream myfile;
+    myfile.open(file_name);
+    int line_cnt = 0;
+    for (auto c : corr) {
+        int lid0 = c.source_point_.scan_line_id_;
+        int vid0 = c.source_point_.vertex_id_;
+        int lid1 = c.target_points_[0].scan_line_id_;
+        int vid1 = c.target_points_[0].vertex_id_;
+        myfile << std::to_string(lid0 * 870 + vid0) << " "
+               << std::to_string(lid1 * 870 + vid1) << "\n";
+    }
+    myfile.close();
 }
 
 std::tuple<bool, Eigen::Matrix4d> Execution(const LidarScan &source_input,
@@ -363,8 +385,8 @@ std::tuple<bool, Eigen::Matrix4d> Execution(const LidarScan &source_input,
     // save_feature_for_debugging(std::get<0>(target_index), "target_edge.txt");
     // save_feature_for_debugging(std::get<1>(target_index), "target_planar.txt");
 
-    bool is_success;
-    Eigen::Matrix4d extrinsic;
+    bool is_success = false;
+    Eigen::Matrix4d extrinsic = Eigen::Matrix4d::Identity();
 
     for (int iter = 0; iter < option.iteration_number_; iter++) {
         
@@ -374,6 +396,9 @@ std::tuple<bool, Eigen::Matrix4d> Execution(const LidarScan &source_input,
         auto planar_corr = GetMatchingPoints(
                 std::get<1>(source_index), std::get<1>(target_index),
                 source, std::get<1>(target_tree), PLANAR);
+
+        save_corr_for_debugging(edge_corr, "edge_corr.txt");
+        save_corr_for_debugging(planar_corr, "planar_corr.txt");
 
         // retrieve 6D motion
         auto f_edge = [&](int i, Eigen::Vector6d &J_r, double &r) {
@@ -393,13 +418,14 @@ std::tuple<bool, Eigen::Matrix4d> Execution(const LidarScan &source_input,
         JTJ = JTJ_edge + JTJ_planar;
         JTr = JTr_edge + JTr_planar;
 
-        std::tie(is_success, extrinsic) =
+        Eigen::Matrix4d delta;
+        std::tie(is_success, delta) =
                 SolveJacobianSystemAndObtainExtrinsicMatrix(JTJ, JTr);
+        delta(0, 3) = 1.0;
 
         std::cout << "Estimated 4x4 motion matrix : " << std::endl;
-        std::cout << extrinsic << std::endl;
-
-        source.Transform(extrinsic);
+        source.Transform(delta);
+        extrinsic = delta * extrinsic;
     }
 
     if (!is_success) {

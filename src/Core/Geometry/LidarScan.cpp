@@ -27,7 +27,7 @@
 #include "LidarScan.h"
 
 // #include <Eigen/Dense>
-// #include <Core/Utility/Console.h>
+#include <Core/Utility/Console.h>           // just for debugging
 // #include <Core/Geometry/KDTreeFlann.h>
 #include <Core/Geometry/PointCloud.h>
 
@@ -45,11 +45,11 @@ bool LidarScan::IsEmpty() // const?
 }
 
 bool LidarScan::Transform(Eigen::Matrix4d T /*=Eigen::Matrix4d::Identity()*/) {
-    Eigen::Matrix3d R = T.block<3, 3>(0, 0);
-    Eigen::Vector3d t = T.block<3, 1>(0, 3);
-    for (auto line : scan_lines_) {
-        for (int i = 0; i < line.points_per_line_; i++) {
-            line.points_[i] = R * line.points_[i] + t;
+    for (auto &line : scan_lines_) {
+        for (auto &point : line.points_) {
+            Eigen::Vector4d new_point = T * Eigen::Vector4d(
+                point(0), point(1), point(2), 1.0);
+            point = new_point.block<3, 1>(0, 0);
         }
     }
     return true;
@@ -58,7 +58,7 @@ bool LidarScan::Transform(Eigen::Matrix4d T /*=Eigen::Matrix4d::Identity()*/) {
 bool LidarScan::UndistortScan(Eigen::Matrix4d T /*=Eigen::Matrix4d::Identity()*/) {
     Eigen::Matrix3d R = T.block<3, 3>(0, 0);
     Eigen::Vector3d t = T.block<3, 1>(0, 3);
-    for (auto line : scan_lines_) {
+    for (auto &line : scan_lines_) {
         for (int i = 0; i < line.points_per_line_; i++) {
             double ratio = double(i) / (line.points_per_line_ - 1);
             // linear motion model
