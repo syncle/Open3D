@@ -36,28 +36,50 @@
 #include <Core/Geometry/KDTreeFlann.h>
 #include <Core/Geometry/PointCloud.h>
 #include <Core/Utility/Console.h>
+#include <Core/Utility/Eigen.h>
+
+// for debugging
+#include <iostream>
+#include <fstream>
 
 namespace open3d {
 
 namespace {
 
-// Eq (1)
-void ComputeCurvature(const LidarScanLine& scan_line, std::vector<double> &curvature)
+std::vector<int> CreateIndexVector(int n)
 {
-    int s = scan_line.points_.size();
-    curvature.resize(s);
-    // Eq (1)
-    for (int j=0; j<s; j++) {
-        double c_j = 0.0;
-        auto point_j = scan_line.points_[j];
-        for (int k=0; k<s; k++){
-            if (j==k)
-                continue;
-            auto point_k = scan_line.points_[k];
-            c_j += (point_j - point_k).norm();
-        } 
-        c_j /= (s*point_j.norm());
-        curvature.push_back(c_j); // no need to compute curvature using every points
+    std::vector<int> index(n);
+    // fill index with {0,1,2,...}
+    std::iota(std::begin(index), std::end(index), 0);
+    return std::move(index);
+}
+
+// Eq (1)
+void ComputeCurvature(const LidarScanLine& scan_line, 
+        std::vector<double> &curvature,
+        const OdometryLidarOption &option)
+{
+    int n_points = scan_line.points_.size();
+    curvature.resize(n_points);
+    auto index = CreateIndexVector(n_points);
+    for (int j = 0; j < n_points; j++) {
+        int start = std::max(0, j - option.curvature_window_half_size_);
+        int end = std::min(n_points - 1, j + option.curvature_window_half_size_);
+        std::vector<int> index_j(&index[start], &index[end]);
+        auto pt_j = scan_line.points_[j];
+        int n_valid = 0;
+        double sum = 0.0;
+        for (int i : index_j) {
+            if (scan_line.is_valid_[i]) {
+                sum += (scan_line.points_[i] - pt_j).norm();
+                n_valid++;
+            }
+        }
+        double norm = pt_j.norm();
+        if (norm != 0.0)
+            curvature[j] = sum / (n_valid * norm);
+        else
+            curvature[j] = 0.0;
     }
 }
 
@@ -65,33 +87,46 @@ void ComputeCurvature(const LidarScanLine& scan_line, std::vector<double> &curva
 void ComputeAngleAndDiscontinuity(const LidarScanLine& scan_line, 
         std::vector<double>& angle, std::vector<double>& discontinuity)
 {
-    int s = scan_line.points_.size();
-    angle.resize(s);
-    discontinuity.resize(s);
-    for (int i=0; i<s; i++) {
+    int n_points = scan_line.points_.size();
+    angle.resize(n_points);
+    discontinuity.resize(n_points);
+    for (int i = 0; i < n_points; i++) {
         Eigen::Vector3d surface_grad;
-        if (i==0){
-            surface_grad = (scan_line.points_[1]-scan_line.points_[0]);
+        int i_m_1 = std::max(0, i - 1);
+        int i_p_1 = std::min(n_points - 1, i + 1);
+        if (scan_line.is_valid_[i] && scan_line.is_valid_[i_m_1] &&
+            scan_line.is_valid_[i_p_1]) {
+            surface_grad = scan_line.points_[i_p_1] - scan_line.points_[i_m_1];
+            Eigen::Vector3d scan_direction = scan_line.points_[i];
+            scan_direction.normalize();
+            double norm_surface_grad = surface_grad.norm();
+            if (norm_surface_grad > 0.0) surface_grad /= norm_surface_grad;
+            angle[i] = std::abs(surface_grad.dot(scan_direction));
+            discontinuity[i] = norm_surface_grad;  // we should only pick OCCLUDED points -
+        } else {
+            angle[i] = 1.0;
+            discontinuity[i] = 9999.0;  // smarter?
         }
-        else if (i==s-1) {
-            surface_grad = (scan_line.points_[s-1]-scan_line.points_[s-2]);
-        }
-        else {
-            // is this the best way?
-            surface_grad = (scan_line.points_[i+1]-scan_line.points_[i-1]);
-        }
-        Eigen::Vector3d scan_direction = scan_line.points_[i];
-        scan_direction.normalize();               
-        double norm_surface_grad = surface_grad.norm();
-        surface_grad /= norm_surface_grad;               
-        angle[i] = surface_grad.dot(scan_direction); // should do absolute?
-        discontinuity[i] = norm_surface_grad;        // we should only pick OCCLUDED points - should consider minus?
     }
 }
 
+void save_double_vector_for_debugging(const std::vector<std::vector<double>>& input, const char* file_name) {
+    PrintError("save_double_vector_for_debugging\n");
+    std::ofstream myfile;
+    myfile.open(file_name);
+    int line_cnt = 0;
+    for (auto line : input) {
+        for (auto val : line) {
+            myfile << std::to_string(val) << "\n";
+        }
+    }
+    myfile.close();
+}
+
 // Section V-A
-void DetectEdgePlanarFeature(const LidarScanLine& scan_line, const std::vector<double> &c, 
-        std::vector<int>& edge, std::vector<int>& planar, const OdometryLidarOption &option)
+void DetectEdgePlanarFeature(const LidarScanLine& scan_line, const std::vector<double> &curvature, 
+        std::vector<int>& edge, std::vector<int>& planar, const OdometryLidarOption &option,
+        std::vector<double>& angular, std::vector<double>& depth)
 {
     // seperate a scan into four identical subregions 
     // to evenly distribute the feature points
@@ -99,42 +134,64 @@ void DetectEdgePlanarFeature(const LidarScanLine& scan_line, const std::vector<d
     std::vector<double> angle, discontinuity;
     ComputeAngleAndDiscontinuity(scan_line, angle, discontinuity);
     assert(s % option.region_div_ != 0);
-    int div = s / option.region_div_;        
-    for (int j=0; j<option.region_div_; j++) {            
-        auto first = c.begin() + div*j;
-        auto last = first + div;
-        std::vector<double> c_j(first, last);
-        std::vector<int> index(div);
-        std::iota(std::begin(index), std::end(index), div); // fill index with {0,1,2,...}
-        sort(index.begin(), index.end(), [&c_j](size_t i, size_t j) {return c_j[i] < c_j[j];});
-        // A point i can be selected as an edge or a planar point only if its c value 
-        // is larger or smaller than a threshold.
-        std::vector<int> edge_j;
-        std::vector<int> planar_j;
-        for (int k=0; k<div; k++) {
-            if (angle[k] > option.angular_threshold_ && 
-                    discontinuity[k] < option.depth_diff_threshold_) {
-                if (c_j[k] > option.feature_selection_threshold_ && edge_j.size() < option.edge_feature_in_div_) {
-                    edge_j.push_back(index[k]);                    
-                    edge.push_back(index[k]+div*j);
+    int n_division = s / option.region_div_; // need to handle non-integer case
+
+    for (int d=0; d<option.region_div_; d++) {
+        auto first = curvature.begin() + (n_division * d);
+        auto last = first + n_division;
+        std::vector<double> curvature_d(first, last);
+        std::vector<double> angle_d(first, last);
+        std::vector<double> discontinuity_d(first, last);
+
+        // sort curvature values
+        auto index = CreateIndexVector(n_division);
+        sort(index.begin(), index.end(), [&curvature_d](size_t i, size_t j) {
+            return curvature_d[i] < curvature_d[j];
+        });
+
+        // A point i can be selected as an edge or a planar point only if its c
+        // value is larger or smaller than a threshold.
+        // planar feature detection
+        int cnt_div_planar_feature = 0;
+        for (int i = 0; i < n_division; i++) { // small to large curvature value
+            int i_sorted = index[i];
+            if (angle_d[i_sorted] < option.angular_threshold_ && 
+                    discontinuity_d[i_sorted] < option.depth_diff_threshold_) {
+                if (curvature_d[i_sorted] != 0.0 &&
+                    curvature_d[i_sorted] < option.feature_selection_threshold_ &&
+                    cnt_div_planar_feature < option.planar_feature_in_div_) {
+                    planar.push_back(i_sorted + n_division * d);
+                    cnt_div_planar_feature++;
                 }
-                if (c_j[k] < option.feature_selection_threshold_ && planar_j.size() < option.edge_feature_in_div_) {
-                    planar_j.push_back(index[k]);
-                    planar.push_back(index[k]+div*j);
+            }
+        }
+        // edge feature detection
+        int cnt_div_edge_feature = 0;
+        for (int i = n_division - 1; i >= 0; i--) { // large to small curvature value
+            int i_sorted = index[i];
+            if (angle_d[i_sorted] < option.angular_threshold_ && 
+                    discontinuity_d[i_sorted] < option.depth_diff_threshold_) {
+                if (curvature_d[i_sorted] != 0.0 &&
+                    curvature_d[i_sorted] >= option.feature_selection_threshold_ &&
+                    cnt_div_edge_feature < option.edge_feature_in_div_) {
+                    edge.push_back(i_sorted + n_division * d);
+                    cnt_div_edge_feature++;
                 }
             }
         }
     }
+    angular = angle;        // for debugging
+    depth = discontinuity;  // for debugging
 }
 
 std::shared_ptr<KDTreeFlann> MakeFeatureKDTree(
         const LidarScanLine &scan_line, const std::vector<int> ind)
 {
     PointCloud temp_pcd;
-    for (auto point: scan_line.points_) {
-        temp_pcd.points_.push_back(point);
+    for (auto i : ind) {
+        temp_pcd.points_.push_back(scan_line.points_[i]);
     }
-    std::shared_ptr<KDTreeFlann> kd_tree;
+    auto kd_tree = std::make_shared<KDTreeFlann>();
     kd_tree->SetGeometry(temp_pcd);
     return kd_tree;
 }
@@ -143,18 +200,30 @@ std::shared_ptr<KDTreeFlann> MakeFeatureKDTree(
 typedef std::vector<std::shared_ptr<KDTreeFlann>> FeatureTree;
 typedef std::vector<std::vector<int>> FeatureIndex;
 typedef std::tuple<FeatureTree, FeatureIndex> LidarFeature;
-std::tuple<LidarFeature, LidarFeature> Preprocessing(const LidarScan &scan, const OdometryLidarOption &option)
+std::tuple<LidarFeature, LidarFeature> Preprocessing(
+        const LidarScan &scan, const OdometryLidarOption &option)
 {
     // line-by-line processing
     FeatureTree edge_trees, planar_trees;
     FeatureIndex edge_indices, planar_indices;
+
+    std::vector<std::vector<double>> curvature_debug;       // for debugging
+    std::vector<std::vector<double>> angular_debug;         // for debugging
+    std::vector<std::vector<double>> depth_debug;           // for debugging
+
     for (int i=0; i<scan.scan_lines_.size(); i++) {
         auto scan_line = scan.scan_lines_[i];
         int s = scan_line.points_.size();
         std::vector<double> curvature;
-        ComputeCurvature(scan_line, curvature);
+        ComputeCurvature(scan_line, curvature, option);     
+        curvature_debug.push_back(curvature);               // for debugging
+        
         std::vector<int> edge, planar;
-        DetectEdgePlanarFeature(scan_line, curvature, edge, planar, option);
+        std::vector<double> angular, depth;                 // for debugging
+        DetectEdgePlanarFeature(scan_line, curvature, edge, planar, option, angular, depth);
+        angular_debug.push_back(angular);
+        depth_debug.push_back(depth);
+
         edge_indices.push_back(edge);
         planar_indices.push_back(planar);
         edge_trees.push_back(MakeFeatureKDTree(scan_line, edge));
@@ -162,7 +231,26 @@ std::tuple<LidarFeature, LidarFeature> Preprocessing(const LidarScan &scan, cons
     }
     auto edge_feature = std::make_tuple(edge_trees, edge_indices);
     auto planar_feature = std::make_tuple(planar_trees, planar_indices);
+
+    save_double_vector_for_debugging(curvature_debug, "curvature.txt"); // for debugging
+    save_double_vector_for_debugging(angular_debug, "angular.txt");     // for debugging
+    save_double_vector_for_debugging(depth_debug, "depth.txt");         // for debugging
+
     return std::make_tuple(edge_feature, planar_feature);
+}
+
+void save_feature_for_debugging(const FeatureIndex& index, const char* file_name) {
+    PrintError("save_feature_for_debugging\n");
+    std::ofstream myfile;
+    myfile.open(file_name);
+    int line_cnt = 0;
+    for(auto line : index) {
+        for (auto id : line) {
+            myfile << std::to_string(line_cnt * 870 + id) << "\n";
+        }
+        line_cnt++;
+    }
+    myfile.close();
 }
 
 enum MatchingMode {
@@ -239,7 +327,6 @@ Correspondences GetMatchingPoints(
                 temp.vertex_id_ = min_m;
                 corr.target_points_.push_back(temp);
             }
-
             output.push_back(corr);
         }   
     }
@@ -265,8 +352,15 @@ std::tuple<bool, Eigen::Matrix4d> Execution(const LidarScan &source,
                                             const LidarScan &target,
                                             const OdometryLidarOption &option) {
     // need to do some warping for source point cloud.
-    auto source_feature = Preprocessing(source, option); // devide preprocessing components - not all components are being used.
+    auto source_feature = Preprocessing(source, option);
     auto target_feature = Preprocessing(target, option);
+
+    // for debugging
+    save_feature_for_debugging(std::get<1>(std::get<0>(source_feature)), "source_edge.txt");
+    save_feature_for_debugging(std::get<1>(std::get<1>(source_feature)), "source_planar.txt");
+    save_feature_for_debugging(std::get<1>(std::get<0>(target_feature)), "target_edge.txt");
+    save_feature_for_debugging(std::get<1>(std::get<1>(target_feature)), "target_planar.txt");
+    
     Correspondences edge_corr, planar_corr;
     std::tie(edge_corr, planar_corr) = Matching(
             std::get<0>(source_feature), std::get<1>(source_feature),
@@ -300,6 +394,8 @@ std::tuple<bool, Eigen::Matrix4d> Execution(const LidarScan &source,
     } else {
         return std::make_tuple(true, extrinsic);
     }
+
+    // return std::make_tuple(false, Eigen::Matrix4d::Identity());
 }
 
 }   // unnamed namespace

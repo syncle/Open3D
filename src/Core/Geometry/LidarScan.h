@@ -37,6 +37,7 @@ class PointCloud;
 class LidarScanLine {
 public:
     int points_per_line_;
+    std::vector<bool> is_valid_;
     std::vector<Eigen::Vector3d> points_; // should be the order of the scanning
     std::vector<Eigen::Vector3d> colors_;
 };

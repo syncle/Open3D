@@ -66,14 +66,20 @@ std::shared_ptr<LidarScan> ReadLidarScanFromKITFormat(
         line.points_per_line_ = depth->width_;
         for (int u = 0; u < depth->width_; u++) {
             float d = float(*PointerAt<unsigned short>(*depth, u, v)) / 500.0f;
-            float theta = radian(double(u) * scale + 180.0);
-            float rho = radian(90.0 - velodyne_hd64_vertical[v]); // not necessary
-            float x = d * std::sin(rho) * std::cos(theta);
-            float y = d * std::sin(rho) * std::sin(theta);
-            float z = d * std::cos(rho);
-            Eigen::Vector3d p;
-            p << x, y, z;
-            line.points_.push_back(p);
+            if (d == 0.0f) {
+                line.points_.push_back(Eigen::Vector3d::Zero());
+                line.is_valid_.push_back(false);
+            } else {
+                float theta = radian(double(u) * scale + 180.0);
+                float rho = radian(90.0 - velodyne_hd64_vertical[v]); // not necessary
+                float x = d * std::sin(rho) * std::cos(theta);
+                float y = d * std::sin(rho) * std::sin(theta);
+                float z = d * std::cos(rho);
+                // PrintDebug("%f, %f, %f\n", x, y, z);
+                Eigen::Vector3d p(x, y, z);
+                line.points_.push_back(p);
+                line.is_valid_.push_back(true);
+            }
         }
         scan->scan_lines_.push_back(line);
     }

@@ -34,18 +34,20 @@ class OdometryLidarOption
 {
 public:
     OdometryLidarOption(
-            double feature_selection_threshold = 0.0,
-            double angular_threshold = 0.0,
-            double depth_diff_threshold = 0.0,
-            int region_div_ = 4,
-            int edge_feature_in_div = 2,
-            int planar_feature_in_div = 4) :
+            double feature_selection_threshold = 5e-2,
+            double angular_threshold = 0.8660,/*approx. cos(30deg)*/
+            double depth_diff_threshold = 3.0,/*in meter*/
+            int region_div_ = 16,
+            int edge_feature_in_div = 4,
+            int planar_feature_in_div = 4,
+            int curvature_window_half_size = 5) :
             feature_selection_threshold_(feature_selection_threshold),
             angular_threshold_(angular_threshold),
             depth_diff_threshold_(depth_diff_threshold),
             region_div_(region_div_),
             edge_feature_in_div_(edge_feature_in_div),
-            planar_feature_in_div_(planar_feature_in_div) {}
+            planar_feature_in_div_(planar_feature_in_div),
+            curvature_window_half_size_(curvature_window_half_size) {}
     ~OdometryLidarOption() {}
 
 public:
@@ -55,6 +57,7 @@ public:
     int region_div_; // division number to distribute features evenly
     int edge_feature_in_div_;
     int planar_feature_in_div_;
+    int curvature_window_half_size_;
 };
 
 }

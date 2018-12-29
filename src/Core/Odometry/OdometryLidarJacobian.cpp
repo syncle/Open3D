@@ -29,6 +29,7 @@
 #include <vector>
 #include <tuple>
 #include <Eigen/Dense>
+#include <Core/Utility/Console.h> // just for debugging
 
 namespace open3d {
 
@@ -36,6 +37,9 @@ void ComputeJacobianAndResidualForEdgeFeatures(int row, Eigen::Vector6d &J_r,
                                 double &r, const LidarScan &source,
                                 const LidarScan &target,
                                 const std::vector<LiderScanPointCorrespondence> &edge_corr) {
+    J_r = Eigen::Vector6d::Zero();
+    r = 0.0;
+
     auto source_point = edge_corr[row].source_point_;
     auto target_point_0 = edge_corr[row].target_points_[0];
     auto target_point_1 = edge_corr[row].target_points_[1];
@@ -54,9 +58,10 @@ void ComputeJacobianAndResidualForEdgeFeatures(int row, Eigen::Vector6d &J_r,
     // add some verification to avoid dividing by zero
     auto temp0 = (X_i - X_j).cross(X_i - X_l);
     double temp1 = (X_j - X_l).norm();
+    if (temp1 == 0.0)
+        return;
 
     // edge term
-    J_r = Eigen::Vector6d::Zero();
     Eigen::Vector3d f = temp0 / temp0.norm();
     Eigen::Matrix3d dx_dxi = Eigen::Matrix3d::Zero(); // more fancier 3x3 matrix?
     dx_dxi(0, 1) = -X_l(2) - X_j(2);
@@ -86,6 +91,9 @@ void ComputeJacobianAndResidualForPlanarFeatures(
     const LidarScan &source, const LidarScan &target,
     const std::vector<LiderScanPointCorrespondence> &edge_corr) 
 {
+    J_r = Eigen::Vector6d::Zero();
+    r = 0.0;
+
     auto source_point = edge_corr[row].source_point_;
     auto target_point_0 = edge_corr[row].target_points_[0];
     auto target_point_1 = edge_corr[row].target_points_[1];
@@ -111,7 +119,6 @@ void ComputeJacobianAndResidualForPlanarFeatures(
     r = temp1.dot(temp0);
 
     // planar term
-    J_r = Eigen::Vector6d::Zero();
     Eigen::MatrixXd dxi_dT(3, 6);
     dxi_dT.setZero();
     dxi_dT(0, 1) = X_i(2);
