@@ -48,6 +48,7 @@ public:
 public:
     void Clear();
     bool IsEmpty();
+    bool Transform(Eigen::Matrix4d T =Eigen::Matrix4d::Identity());
     bool UndistortScan(Eigen::Matrix4d T = Eigen::Matrix4d::Identity());
 };
 

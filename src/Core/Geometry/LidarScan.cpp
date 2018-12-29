@@ -44,6 +44,17 @@ bool LidarScan::IsEmpty() // const?
     return true;
 }
 
+bool LidarScan::Transform(Eigen::Matrix4d T /*=Eigen::Matrix4d::Identity()*/) {
+    Eigen::Matrix3d R = T.block<3, 3>(0, 0);
+    Eigen::Vector3d t = T.block<3, 1>(0, 3);
+    for (auto line : scan_lines_) {
+        for (int i = 0; i < line.points_per_line_; i++) {
+            line.points_[i] = R * line.points_[i] + t;
+        }
+    }
+    return true;
+}
+
 bool LidarScan::UndistortScan(Eigen::Matrix4d T /*=Eigen::Matrix4d::Identity()*/) {
     Eigen::Matrix3d R = T.block<3, 3>(0, 0);
     Eigen::Vector3d t = T.block<3, 1>(0, 3);

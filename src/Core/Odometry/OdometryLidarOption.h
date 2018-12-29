@@ -40,14 +40,16 @@ public:
             int region_div_ = 16,
             int edge_feature_in_div = 4,
             int planar_feature_in_div = 4,
-            int curvature_window_half_size = 5) :
+            int curvature_window_half_size = 5,
+            int iteration_number = 10) :
             feature_selection_threshold_(feature_selection_threshold),
             angular_threshold_(angular_threshold),
             depth_diff_threshold_(depth_diff_threshold),
             region_div_(region_div_),
             edge_feature_in_div_(edge_feature_in_div),
             planar_feature_in_div_(planar_feature_in_div),
-            curvature_window_half_size_(curvature_window_half_size) {}
+            curvature_window_half_size_(curvature_window_half_size),
+            iteration_number_(iteration_number) {}
     ~OdometryLidarOption() {}
 
 public:
@@ -58,6 +60,7 @@ public:
     int edge_feature_in_div_;
     int planar_feature_in_div_;
     int curvature_window_half_size_;
+    int iteration_number_;
 };
 
 }
