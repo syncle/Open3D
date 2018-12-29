@@ -71,7 +71,6 @@ std::shared_ptr<LidarScan> ReadLidarScanFromKITFormat(
             float x = d * std::sin(rho) * std::cos(theta);
             float y = d * std::sin(rho) * std::sin(theta);
             float z = d * std::cos(rho);
-            // PrintDebug("%f, %f, %f\n", x, y, z);
             Eigen::Vector3d p;
             p << x, y, z;
             line.points_.push_back(p);

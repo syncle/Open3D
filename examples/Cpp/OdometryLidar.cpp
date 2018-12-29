@@ -31,6 +31,7 @@
 #include <Core/Odometry/OdometryLidarOption.h>
 #include <Core/Utility/Console.h>
 #include <IO/ClassIO/LidarScanIO.h>
+#include <IO/ClassIO/PointCloudIO.h>
 #include <Visualization/Visualization.h>
 
 // #include <IO/IO.h>
@@ -67,16 +68,18 @@ int main(int argc, char *argv[])
     auto source_pcd = CreatePointCloudFromLidarScan(*source);
     auto target_pcd = CreatePointCloudFromLidarScan(*target);
     DrawGeometries({source_pcd, target_pcd});
+    WritePointCloud("source.ply", *source_pcd);
+    WritePointCloud("target.ply", *target_pcd);
 
-    // OdometryLidarOption option;
-    // bool is_success; 
-    // Eigen::Matrix4d trans;
-    // std::tie(is_success, trans) = ComputeOdometryLidar(
-    //     *source, *target, Eigen::Matrix4d::Identity(), option);
+    // compute odometry from Lidar data
+    OdometryLidarOption option;
+    bool is_success;
+    Eigen::Matrix4d trans;
+    std::tie(is_success, trans) = ComputeOdometryLidar(
+        *source, *target, Eigen::Matrix4d::Identity(), option);
 
-    // std::cout << "Estimated 4x4 motion matrix : " << std::endl;
-    // std::cout << trans << std::endl;
+    std::cout << "Estimated 4x4 motion matrix : " << std::endl;
+    std::cout << trans << std::endl;
 
-    // return int(!is_success);
-    return 0;
+    return int(!is_success);
 }
