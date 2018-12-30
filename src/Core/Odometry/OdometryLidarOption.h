@@ -41,7 +41,7 @@ public:
             int edge_feature_in_div = 4,
             int planar_feature_in_div = 4,
             int curvature_window_half_size = 5,
-            int iteration_number = 10) :
+            int iteration_number = 50) :
             feature_selection_threshold_(feature_selection_threshold),
             angular_threshold_(angular_threshold),
             depth_diff_threshold_(depth_diff_threshold),

@@ -30,6 +30,7 @@
 #include <tuple>
 #include <Eigen/Dense>
 #include <Core/Utility/Console.h> // just for debugging
+#include <iostream>
 
 namespace open3d {
 
@@ -51,15 +52,21 @@ void ComputeJacobianAndResidualForEdgeFeatures(int row, Eigen::Vector6d &J_r,
     int line_l = target_point_1.scan_line_id_;
     int l = target_point_1.vertex_id_;
 
-    auto X_i = target.scan_lines_[line_i].points_[i];
-    auto X_j = source.scan_lines_[line_j].points_[j];
-    auto X_l = source.scan_lines_[line_l].points_[l];
+    auto X_i = source.scan_lines_[line_i].points_[i];
+    auto X_j = target.scan_lines_[line_j].points_[j];
+    auto X_l = target.scan_lines_[line_l].points_[l];
     
     // add some verification to avoid dividing by zero
     auto temp0 = (X_i - X_j).cross(X_i - X_l);
-    double temp1 = (X_j - X_l).norm();
-    if (temp1 == 0.0)
+    double temp0_norm = temp0.norm();
+    double temp1_norm = (X_j - X_l).norm();
+    if (temp0_norm == 0.0 || temp1_norm == 0.0) {
+        std::cout << X_j << std::endl;
+        std::cout << X_l << std::endl;
+        PrintError("temp0_norm : %f\n", temp0_norm);
+        PrintError("temp1_norm : %f\n", temp1_norm);
         return;
+    }
 
     // edge term
     Eigen::Vector3d f = temp0 / temp0.norm();
@@ -82,8 +89,9 @@ void ComputeJacobianAndResidualForEdgeFeatures(int row, Eigen::Vector6d &J_r,
     dxi_dT(2, 1) = -X_i(0);
     dxi_dT(2, 5) = 1.0;  // this matrix can be reused. How this is defined in
                          // other examples?
-    J_r = (1 / temp1) * f.transpose() * dx_dxi * dxi_dT;
-    r = temp0.norm() / temp1;  // point to line distance, relative contribution based on rotation angle.
+    J_r = (1 / temp1_norm) * f.transpose() * dx_dxi * dxi_dT;
+    r = temp0_norm / temp1_norm;  // point to line distance, relative
+                                  // contribution based on rotation angle.
 }
 
 void ComputeJacobianAndResidualForPlanarFeatures(
@@ -108,15 +116,22 @@ void ComputeJacobianAndResidualForPlanarFeatures(
     int line_m = target_point_2.scan_line_id_;
     int m = target_point_2.vertex_id_;
 
-    auto X_i = target.scan_lines_[line_i].points_[i]; // source <-> target ?
-    auto X_j = source.scan_lines_[line_j].points_[j];
-    auto X_l = source.scan_lines_[line_l].points_[l];
-    auto X_m = source.scan_lines_[line_m].points_[m];
+    auto X_i = source.scan_lines_[line_i].points_[i]; // source <-> target ?
+    auto X_j = target.scan_lines_[line_j].points_[j];
+    auto X_l = target.scan_lines_[line_l].points_[l];
+    auto X_m = target.scan_lines_[line_m].points_[m];
 
     auto temp0 = ((X_j - X_l).cross(X_j - X_m));
-    temp0.normalize();
+    double temp0_norm = temp0.norm();
+    if (temp0_norm == 0.0) {
+        std::cout << X_j << std::endl;
+        std::cout << X_l << std::endl;
+        std::cout << X_m << std::endl;
+        PrintError("temp0_norm : %f\n", temp0_norm);
+        return;
+    }
     auto temp1 = (X_i - X_j);
-    r = temp1.dot(temp0);
+    r = temp1.dot(temp0) / temp0_norm;
 
     // planar term
     Eigen::MatrixXd dxi_dT(3, 6);
