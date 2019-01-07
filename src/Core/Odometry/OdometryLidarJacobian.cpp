@@ -61,10 +61,14 @@ void ComputeJacobianAndResidualForEdgeFeatures(int row, Eigen::Vector6d &J_r,
     double temp0_norm = temp0.norm();
     double temp1_norm = (X_j - X_l).norm();
     if (temp0_norm == 0.0 || temp1_norm == 0.0) {
-        std::cout << X_j << std::endl;
-        std::cout << X_l << std::endl;
-        PrintError("temp0_norm : %f\n", temp0_norm);
-        PrintError("temp1_norm : %f\n", temp1_norm);
+        // std::cout << X_i << std::endl;
+        // std::cout << X_j << std::endl;
+        // std::cout << X_l << std::endl;
+        // PrintError("line_i : %d, i : %d\n", line_i, i);
+        // PrintError("line_j : %d, j : %d\n", line_j, j);
+        // PrintError("line_l : %d, l : %d\n", line_l, l);
+        // PrintError("temp0_norm : %f\n", temp0_norm);
+        // PrintError("temp1_norm : %f\n", temp1_norm);
         return;
     }
 

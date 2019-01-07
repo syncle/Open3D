@@ -80,7 +80,7 @@ void ComputeCurvatureLine(const LidarScanLine& scan_line,
             }
         }
         double norm = pt_j.norm();
-        if (norm != 0.0)
+        if (n_valid != 0 && norm != 0.0)
             curvature[j] = sum / (n_valid * norm);
         else
             curvature[j] = 0.0;
@@ -145,7 +145,7 @@ void DetectEdgePlanarFeatureLine(const LidarScanLine& scan_line, const std::vect
 
     for (int d=0; d<option.region_div_; d++) {
         auto first = curvature.begin() + (n_division * d);
-        auto last = first + n_division;
+        auto last = first + n_division + 1;
         std::vector<double> curvature_d(first, last);
         std::vector<double> angle_d(first, last);
         std::vector<double> discontinuity_d(first, last);
@@ -162,13 +162,14 @@ void DetectEdgePlanarFeatureLine(const LidarScanLine& scan_line, const std::vect
         int cnt_div_planar_feature = 0;
         for (int i = 0; i < n_division; i++) { // small to large curvature value
             int i_sorted = index[i];
-            if (!scan_line.is_valid_[i_sorted]) 
+            int i_global = i_sorted + n_division * d;
+            if (!scan_line.is_valid_[i_global])
                 continue;
             if (angle_d[i_sorted] < option.angular_threshold_ && 
                     discontinuity_d[i_sorted] < option.depth_diff_threshold_) {
                 if (curvature_d[i_sorted] < option.feature_selection_threshold_ &&
                     cnt_div_planar_feature < option.planar_feature_in_div_) {
-                    planar.push_back(i_sorted + n_division * d);
+                    planar.push_back(i_global);
                     cnt_div_planar_feature++;
                 }
             }
@@ -177,13 +178,14 @@ void DetectEdgePlanarFeatureLine(const LidarScanLine& scan_line, const std::vect
         int cnt_div_edge_feature = 0;
         for (int i = n_division - 1; i >= 0; i--) { // large to small curvature value
             int i_sorted = index[i];
-            if (!scan_line.is_valid_[i_sorted]) 
+            int i_global = i_sorted + n_division * d;
+            if (!scan_line.is_valid_[i_global])
                 continue;
             if (angle_d[i_sorted] < option.angular_threshold_ && 
                     discontinuity_d[i_sorted] < option.depth_diff_threshold_) {
                 if (curvature_d[i_sorted] >= option.feature_selection_threshold_ &&
                     cnt_div_edge_feature < option.edge_feature_in_div_) {
-                    edge.push_back(i_sorted + n_division * d);
+                    edge.push_back(i_global);
                     cnt_div_edge_feature++;
                 }
             }
@@ -227,9 +229,13 @@ std::shared_ptr<KDTreeFlann> MakeKDTree(
             continue;
         temp_pcd.points_.push_back(scan_line.points_[i]);
     }
-    auto kd_tree = std::make_shared<KDTreeFlann>();
-    kd_tree->SetGeometry(temp_pcd);
-    return kd_tree;
+    if (ind.size() == 0) {
+        return std::make_shared<KDTreeFlann>();
+    } else {
+        auto kd_tree = std::make_shared<KDTreeFlann>();
+        kd_tree->SetGeometry(temp_pcd);
+        return kd_tree;
+    }
 }
 
 // Section V-A
@@ -281,6 +287,7 @@ std::tuple<FeatureTree, FeatureTree> MakePointTrees(const LidarScan &scan,
 {
     FeatureTree edge_trees, planar_trees;
     for (int i = 0; i < scan.scan_lines_.size(); i++) {
+        PrintError("line : %d\n", i);
         auto scan_line = scan.scan_lines_[i];
         edge_trees.push_back(MakeKDTree(scan_line, edge[i]));
         planar_trees.push_back(MakeKDTree(scan_line, planar[i]));
@@ -310,12 +317,12 @@ enum MatchingMode {
 
 typedef std::vector<LiderScanPointCorrespondence> Correspondences;
 Correspondences GetMatchingPoints(
-        const FeatureIndex &source_index, 
+        const FeatureIndex &source_index,
         const FeatureIndex &target_index,
-        const LidarScan &source, 
+        const LidarScan &source,
         const FeatureTree &target_tree, MatchingMode mode)
 {
-    int n_scan_lines = target_tree.size();  // source_tree is not really necessary. Can we do this better?
+    int n_scan_lines = target_tree.size();
 
     std::vector<LiderScanPointCorrespondence> output;
     for (auto line=0; line<n_scan_lines; line++) {
@@ -337,11 +344,11 @@ Correspondences GetMatchingPoints(
                 // if (line == line2) // not searching the same line - this is target line
                 //     continue;
                 auto target_tree_line = target_tree[line2];
-                std::vector<int> indices;
-                std::vector<double> distance2;
+                std::vector<int> indices(1);
+                std::vector<double> distance2(1);
                 int k = target_tree_line->SearchKNN(
                         query_i, 1, indices, distance2);
-                if (k == 0)
+                if (k < 1)
                     continue;
                 if (distance2[0] < min_dist) {
                     min_scan_line_j = line2;
@@ -360,11 +367,11 @@ Correspondences GetMatchingPoints(
                 if (line3 == min_scan_line_j || line3 < 0 || line3 > n_scan_lines-1)
                     continue;
                 auto target_tree_line = target_tree[line3];
-                std::vector<int> indices;
-                std::vector<double> distance2;
+                std::vector<int> indices(1);
+                std::vector<double> distance2(1);
                 int k = target_tree_line->SearchKNN(
                         query_i, 1, indices, distance2);
-                if (k == 0)
+                if (k < 1)
                     continue;
                 if (distance2[0] < min_dist) {
                     min_scan_line_l = line3;
@@ -377,14 +384,14 @@ Correspondences GetMatchingPoints(
 
             int min_scan_line_m = 0, min_m = 0;
             if (mode == PLANAR) {  // pick additional point to make a plane
-                auto tf_line = target_tree[min_scan_line_j];
-                std::vector<int> indices;
-                std::vector<double> distance2;
-                int k = tf_line->SearchKNN(query_i, 2, indices, distance2);
-                if (k == 0)
-                    continue;
                 min_scan_line_m = min_scan_line_j;
-                min_m = target_index[min_scan_line_j][indices[1]];
+                auto tf_line = target_tree[min_scan_line_m];
+                std::vector<int> indices(2);
+                std::vector<double> distance2(2);
+                int k = tf_line->SearchKNN(query_i, 2, indices, distance2);
+                if (k < 2)
+                    continue;
+                min_m = target_index[min_scan_line_m][indices[1]];
                 LiderScanPoint temp;
                 temp.scan_line_id_ = min_scan_line_m;
                 temp.vertex_id_ = min_m;
@@ -434,30 +441,36 @@ std::tuple<bool, Eigen::Matrix4d> Execution(const LidarScan &source_input,
     // need to do some warping for source point cloud.
     LidarScan source = source_input;
     auto source_index = Preprocessing(source, true, option);
-    auto target_index = Preprocessing(target, false, option);
+    auto target_index = Preprocessing(target, true, option);
     auto target_tree = MakePointTrees(target,
             std::get<0>(target_index), std::get<1>(target_index));
 
-    // // for debugging
-    save_feature_for_debugging(std::get<0>(source_index), "source_edge.txt");
-    save_feature_for_debugging(std::get<1>(source_index), "source_planar.txt");
-    save_feature_for_debugging(std::get<0>(target_index), "target_edge.txt");
-    save_feature_for_debugging(std::get<1>(target_index), "target_planar.txt");
+    // for debugging
+    // save_feature_for_debugging(std::get<0>(source_index), "source_edge.txt");
+    // save_feature_for_debugging(std::get<1>(source_index), "source_planar.txt");
+    // save_feature_for_debugging(std::get<0>(target_index), "target_edge.txt");
+    // save_feature_for_debugging(std::get<1>(target_index), "target_planar.txt");
 
     bool is_success = false;
     Eigen::Matrix4d extrinsic = Eigen::Matrix4d::Identity();
 
     for (int iter = 0; iter < option.iteration_number_; iter++) {
-        
+
+        PrintDebug("Iteration : %d / %d\n", iter, option.iteration_number_);
+
         auto edge_corr = GetMatchingPoints(
                 std::get<0>(source_index), std::get<0>(target_index),
                 source, std::get<0>(target_tree), EDGE);
+
         auto planar_corr = GetMatchingPoints(
                 std::get<1>(source_index), std::get<1>(target_index),
                 source, std::get<1>(target_tree), PLANAR);
 
-        save_corr_for_debugging(edge_corr, "edge_corr.txt", 1);
-        save_corr_for_debugging(planar_corr, "planar_corr.txt", 2);
+        // save_corr_for_debugging(edge_corr, "edge_corr_0.txt", 0);
+        // save_corr_for_debugging(edge_corr, "edge_corr_1.txt", 1);
+        // save_corr_for_debugging(planar_corr, "planar_corr_0.txt", 0);
+        // save_corr_for_debugging(planar_corr, "planar_corr_1.txt", 1);
+        // save_corr_for_debugging(planar_corr, "planar_corr_2.txt", 2);
 
         // retrieve 6D motion
         auto f_edge = [&](int i, Eigen::Vector6d &J_r, double &r) {
@@ -476,8 +489,6 @@ std::tuple<bool, Eigen::Matrix4d> Execution(const LidarScan &source_input,
                 f_planar, planar_corr.size());
         JTJ = JTJ_edge + JTJ_planar;
         JTr = JTr_edge + JTr_planar;
-        // JTJ = -(JTJ_edge);
-        // JTr = -(JTr_edge);
         // std::cout << "JTJ_edge" << std::endl;
         // std::cout << JTJ_edge << std::endl;
         // std::cout << "JTr_edge" << std::endl;
