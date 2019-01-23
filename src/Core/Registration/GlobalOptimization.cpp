@@ -209,7 +209,6 @@ std::tuple<Eigen::MatrixXd, Eigen::VectorXd> ComputeLinearSystem(
                 Js.transpose() * t.information_;
         Eigen::Matrix6d JtT_Info =
                 Jt.transpose() * t.information_;
-        Eigen::Vector6d eT_Info = e.transpose() * t.information_;
         double line_process_iter = t.confidence_;
 
         int id_i = t.source_node_id_ * 6;
@@ -223,9 +222,9 @@ std::tuple<Eigen::MatrixXd, Eigen::VectorXd> ComputeLinearSystem(
         H.block<6, 6>(id_j, id_j).noalias() +=
                 line_process_iter * JtT_Info * Jt;
         b.block<6, 1>(id_i, 0).noalias() -=
-                line_process_iter * eT_Info.transpose() * Js;
+                line_process_iter * JsT_Info * e;
         b.block<6, 1>(id_j, 0).noalias() -=
-                line_process_iter * eT_Info.transpose() * Jt;
+                line_process_iter * JtT_Info * e;
     }
     return std::make_tuple(std::move(H), std::move(b));
 }

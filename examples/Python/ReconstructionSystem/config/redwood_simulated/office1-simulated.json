@@ -9,7 +9,7 @@
     "preference_loop_closure_odometry": 0.1,
     "preference_loop_closure_registration": 20.0,
     "tsdf_cubic_size": 4.0,
-    "icp_method": "point_to_point",
+    "icp_method": "point_to_plane",
     "global_registration": "ransac",
     "python_multi_threading": true
 }
