@@ -849,10 +849,12 @@ bool ReadVoxelGridFromPLY(const std::string &filename,
 
     voxelgrid.Clear();
     for (auto &it : voxelgrid_ptr) {
+        const auto &grid_index = it.grid_index_;
+        const auto &voxel_data = it.color_;
         if (state.color_num > 0)
-            voxelgrid.AddVoxel(geometry::Voxel(it.grid_index_, it.color_));
+            voxelgrid.AddVoxel(grid_index, voxel_data);
         else
-            voxelgrid.AddVoxel(geometry::Voxel(it.grid_index_));
+            voxelgrid.AddVoxel(grid_index);
     }
     voxelgrid.origin_ = state.origin;
     voxelgrid.voxel_size_ = state.voxel_size;
@@ -917,12 +919,13 @@ bool WriteVoxelGridToPLY(const std::string &filename,
     ply_write(ply_file, voxelgrid.voxel_size_);
 
     for (auto &it : voxelgrid.voxels_) {
-        const geometry::Voxel &voxel = it.second;
-        ply_write(ply_file, voxel.grid_index_(0));
-        ply_write(ply_file, voxel.grid_index_(1));
-        ply_write(ply_file, voxel.grid_index_(2));
+        const auto &grid_index = it.first;
+        ply_write(ply_file, grid_index(0));
+        ply_write(ply_file, grid_index(1));
+        ply_write(ply_file, grid_index(2));
 
-        const Eigen::Vector3d &color = voxel.color_;
+        const auto &voxel_data = it.second;
+        const auto &color = voxel_data.color_;
         ply_write(ply_file, std::min(255.0, std::max(0.0, color(0) * 255.0)));
         ply_write(ply_file, std::min(255.0, std::max(0.0, color(1) * 255.0)));
         ply_write(ply_file, std::min(255.0, std::max(0.0, color(2) * 255.0)));

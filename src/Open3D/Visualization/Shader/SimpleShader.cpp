@@ -555,11 +555,12 @@ bool SimpleShaderForVoxelGridLine::PrepareBinding(
     colors.clear();  // Final size: num_voxels * 12 * 2
 
     for (auto &it : voxel_grid.voxels_) {
-        const geometry::Voxel &voxel = it.second;
+        const auto &grid_index = it.first;
+        const auto &voxel_data = it.second;
         // 8 vertices in a voxel
         Eigen::Vector3f base_vertex =
                 voxel_grid.origin_.cast<float>() +
-                voxel.grid_index_.cast<float>() * voxel_grid.voxel_size_;
+                grid_index.cast<float>() * voxel_grid.voxel_size_;
         std::vector<Eigen::Vector3f> vertices;
         for (const Eigen::Vector3i &vertex_offset : cuboid_vertex_offsets) {
             vertices.push_back(base_vertex + vertex_offset.cast<float>() *
@@ -583,7 +584,7 @@ bool SimpleShaderForVoxelGridLine::PrepareBinding(
                 break;
             case RenderOption::MeshColorOption::Color:
                 if (voxel_grid.HasColors()) {
-                    voxel_color = voxel.color_;
+                    voxel_color = voxel_data.color_;
                     break;
                 }
             case RenderOption::MeshColorOption::Default:
@@ -645,11 +646,12 @@ bool SimpleShaderForVoxelGridFace::PrepareBinding(
     colors.clear();  // Final size: num_voxels * 36
 
     for (auto &it : voxel_grid.voxels_) {
-        const geometry::Voxel &voxel = it.second;
+        const auto &grid_index = it.first;
+        const auto &voxel_data = it.second;
         // 8 vertices in a voxel
         Eigen::Vector3f base_vertex =
                 voxel_grid.origin_.cast<float>() +
-                voxel.grid_index_.cast<float>() * voxel_grid.voxel_size_;
+                grid_index.cast<float>() * voxel_grid.voxel_size_;
         std::vector<Eigen::Vector3f> vertices;
         for (const Eigen::Vector3i &vertex_offset : cuboid_vertex_offsets) {
             vertices.push_back(base_vertex + vertex_offset.cast<float>() *
@@ -673,7 +675,7 @@ bool SimpleShaderForVoxelGridFace::PrepareBinding(
                 break;
             case RenderOption::MeshColorOption::Color:
                 if (voxel_grid.HasColors()) {
-                    voxel_color = voxel.color_;
+                    voxel_color = voxel_data.color_;
                     break;
                 }
             case RenderOption::MeshColorOption::Default:

@@ -60,8 +60,8 @@ Eigen::Vector3d VoxelGrid::GetMinBound() const {
     } else {
         Eigen::Array3i min_grid_index = voxels_.begin()->first;
         for (const auto &it : voxels_) {
-            const geometry::Voxel &voxel = it.second;
-            min_grid_index = min_grid_index.min(voxel.grid_index_.array());
+            const auto &grid_index = it.first;
+            min_grid_index = min_grid_index.min(grid_index.array());
         }
         return min_grid_index.cast<double>() * voxel_size_ + origin_.array();
     }
@@ -73,8 +73,8 @@ Eigen::Vector3d VoxelGrid::GetMaxBound() const {
     } else {
         Eigen::Array3i max_grid_index = voxels_.begin()->first;
         for (const auto &it : voxels_) {
-            const geometry::Voxel &voxel = it.second;
-            max_grid_index = max_grid_index.max(voxel.grid_index_.array());
+            const auto &grid_index = it.first;
+            max_grid_index = max_grid_index.max(grid_index.array());
         }
         return (max_grid_index.cast<double>() + 1) * voxel_size_ +
                origin_.array();
@@ -89,8 +89,8 @@ Eigen::Vector3d VoxelGrid::GetCenter() const {
     const Eigen::Vector3d half_voxel_size(0.5 * voxel_size_, 0.5 * voxel_size_,
                                           0.5 * voxel_size_);
     for (const auto &it : voxels_) {
-        const geometry::Voxel &voxel = it.second;
-        center += voxel.grid_index_.cast<double>() * voxel_size_ + origin_ +
+        const auto &grid_index = it.first;
+        center += grid_index.cast<double>() * voxel_size_ + origin_ +
                   half_voxel_size;
     }
     center /= double(voxels_.size());
@@ -161,27 +161,29 @@ VoxelGrid &VoxelGrid::operator+=(const VoxelGrid &voxelgrid) {
     Eigen::Vector3i voxel_index;
     bool has_colors = voxelgrid.HasColors();
     for (const auto &it : voxelgrid.voxels_) {
-        const geometry::Voxel &voxel = it.second;
+        const auto &grid_index = it.first;
+        const auto &voxel_data = it.second;
         if (has_colors) {
-            voxelindex_to_accpoint[voxel.grid_index_].Add(voxel.grid_index_,
-                                                          voxel.color_);
+            voxelindex_to_accpoint[grid_index].Add(grid_index,
+                                                   voxel_data.color_);
         } else {
-            voxelindex_to_accpoint[voxel.grid_index_].Add(voxel.grid_index_);
+            voxelindex_to_accpoint[grid_index].Add(grid_index);
         }
     }
     for (const auto &it : voxels_) {
-        const geometry::Voxel &voxel = it.second;
+        const auto &grid_index = it.first;
+        const auto &voxel_data = it.second;
         if (has_colors) {
-            voxelindex_to_accpoint[voxel.grid_index_].Add(voxel.grid_index_,
-                                                          voxel.color_);
+            voxelindex_to_accpoint[grid_index].Add(grid_index,
+                                                   voxel_data.color_);
         } else {
-            voxelindex_to_accpoint[voxel.grid_index_].Add(voxel.grid_index_);
+            voxelindex_to_accpoint[grid_index].Add(grid_index);
         }
     }
     this->voxels_.clear();
     for (const auto &accpoint : voxelindex_to_accpoint) {
-        this->AddVoxel(Voxel(accpoint.second.GetVoxelIndex(),
-                             accpoint.second.GetAverageColor()));
+        this->AddVoxel(accpoint.second.GetVoxelIndex(),
+                       geometry::VoxelData(accpoint.second.GetAverageColor()));
     }
     return *this;
 }
@@ -190,7 +192,8 @@ VoxelGrid VoxelGrid::operator+(const VoxelGrid &voxelgrid) const {
     return (VoxelGrid(*this) += voxelgrid);
 }
 
-Eigen::Vector3i VoxelGrid::GetVoxel(const Eigen::Vector3d &point) const {
+Eigen::Vector3i VoxelGrid::GetVoxelGridIndex(
+        const Eigen::Vector3d &point) const {
     Eigen::Vector3d voxel_f = (point - origin_) / voxel_size_;
     return (Eigen::floor(voxel_f.array())).cast<int>();
 }
@@ -211,8 +214,13 @@ std::vector<Eigen::Vector3d> VoxelGrid::GetVoxelBoundingPoints(
     return points;
 }
 
-void VoxelGrid::AddVoxel(const Voxel &voxel) {
-    voxels_[voxel.grid_index_] = voxel;
+void VoxelGrid::AddVoxel(const Eigen::Vector3i &grid_index,
+                         const VoxelData &voxel_data) {
+    voxels_[grid_index] = voxel_data;
+}
+
+void VoxelGrid::AddVoxel(const Eigen::Vector3i &grid_index) {
+    voxels_[grid_index] = geometry::VoxelData();
 }
 
 std::vector<bool> VoxelGrid::CheckIfIncluded(
@@ -221,7 +229,7 @@ std::vector<bool> VoxelGrid::CheckIfIncluded(
     output.resize(queries.size());
     size_t i = 0;
     for (auto &query_double : queries) {
-        auto query = GetVoxel(query_double);
+        auto query = GetVoxelGridIndex(query_double);
         output[i] = voxels_.count(query) > 0;
         i++;
     }
@@ -262,7 +270,7 @@ void VoxelGrid::CreateFromOctree(const Octree &octree) {
                 Eigen::floor((node_center - Eigen::Array3d(origin_)) /
                              voxel_size_)
                         .cast<int>();
-        AddVoxel(Voxel(grid_index, node->color_));
+        AddVoxel(grid_index, node->color_);
     }
 }
 
@@ -292,8 +300,8 @@ VoxelGrid &VoxelGrid::CarveDepthMap(
     // depth is behind the depth of the depth map at the projected pixel.
     for (auto it = voxels_.begin(); it != voxels_.end();) {
         bool carve = true;
-        const geometry::Voxel &voxel = it->second;
-        auto pts = GetVoxelBoundingPoints(voxel.grid_index_);
+        const auto &grid_index = it->first;
+        auto pts = GetVoxelBoundingPoints(grid_index);
         for (auto &x : pts) {
             auto x_trans = rot * x + trans;
             auto uvz = intrinsic * x_trans;
@@ -335,8 +343,8 @@ VoxelGrid &VoxelGrid::CarveSilhouette(
     // is set (>0).
     for (auto it = voxels_.begin(); it != voxels_.end();) {
         bool carve = true;
-        const geometry::Voxel &voxel = it->second;
-        auto pts = GetVoxelBoundingPoints(voxel.grid_index_);
+        const auto &grid_index = it->first;
+        auto pts = GetVoxelBoundingPoints(grid_index);
         for (auto &x : pts) {
             auto x_trans = rot * x + trans;
             auto uvz = intrinsic * x_trans;

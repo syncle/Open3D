@@ -90,8 +90,9 @@ void pybind_voxelgrid(py::module &m) {
                  "Returns ``True`` if the voxel grid contains voxel colors.")
             .def("has_voxels", &geometry::VoxelGrid::HasVoxels,
                  "Returns ``True`` if the voxel grid contains voxels.")
-            .def("get_voxel", &geometry::VoxelGrid::GetVoxel, "point"_a,
-                 "Returns voxel index given query point.")
+            .def("get_voxel_grid_index",
+                 &geometry::VoxelGrid::GetVoxelGridIndex, "point"_a,
+                 "Returns voxel grid index given query point.")
             .def("check_if_included", &geometry::VoxelGrid::CheckIfIncluded,
                  "queries"_a,
                  "Element-wise check if a query in the list is included in "

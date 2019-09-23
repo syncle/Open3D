@@ -62,6 +62,16 @@ public:
     Eigen::Vector3d color_ = Eigen::Vector3d(0, 0, 0);
 };
 
+class VoxelData {
+public:
+    VoxelData() {}
+    VoxelData(const Eigen::Vector3d &color) : color_(color) {}
+    ~VoxelData() {}
+
+public:
+    Eigen::Vector3d color_ = Eigen::Vector3d(0, 0, 0);
+};
+
 class VoxelGrid : public Geometry3D {
 public:
     VoxelGrid() : Geometry3D(Geometry::GeometryType::VoxelGrid) {}
@@ -90,14 +100,14 @@ public:
     bool HasColors() const {
         return true;  // By default, the colors are (0, 0, 0)
     }
-    Eigen::Vector3i GetVoxel(const Eigen::Vector3d &point) const;
+    Eigen::Vector3i GetVoxelGridIndex(const Eigen::Vector3d &point) const;
 
     // Function that returns the 3d coordinates of the queried voxel center
     Eigen::Vector3d GetVoxelCenterCoordinate(Eigen::Vector3i idx) const {
         auto it = voxels_.find(idx);
         if (it != voxels_.end()) {
-            auto voxel = it->second;
-            return ((voxel.grid_index_.cast<double>() +
+            const auto &grid_index = it->first;
+            return ((grid_index.cast<double>() +
                      Eigen::Vector3d(0.5, 0.5, 0.5)) *
                     voxel_size_) +
                    origin_;
@@ -107,7 +117,8 @@ public:
     }
 
     /// Add a voxel with specified grid index and color
-    void AddVoxel(const Voxel &voxel);
+    void AddVoxel(const Eigen::Vector3i &grid_index);
+    void AddVoxel(const Eigen::Vector3i &grid_index, const VoxelData &voxel);
 
     /// Return a vector of 3D coordinates that define the indexed voxel cube.
     std::vector<Eigen::Vector3d> GetVoxelBoundingPoints(
@@ -182,7 +193,7 @@ public:
     double voxel_size_ = 0.0;
     Eigen::Vector3d origin_ = Eigen::Vector3d::Zero();
     std::unordered_map<Eigen::Vector3i,
-                       Voxel,
+                       VoxelData,
                        utility::hash_eigen::hash<Eigen::Vector3i>>
             voxels_;
 };
