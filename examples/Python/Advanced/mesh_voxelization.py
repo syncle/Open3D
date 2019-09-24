@@ -117,14 +117,16 @@ if __name__ == "__main__":
         print("Retireve all available voxel indices")
         indices = np.asarray(voxel_load.get_all_voxel_indices())
         print(indices)
-        
+
         print("Remove and add voxels")
         voxel_load_copy = copy.copy(voxel_load)
-        removing_indices = indices[:len(indices)//2]
+        removing_indices = indices[:len(indices) // 2]
         print("Removing %d indices" % len(removing_indices))
-        voxel_load_copy.remove_voxel_using_indices(o3d.utility.Vector3iVector(removing_indices))
+        voxel_load_copy.remove_voxel_using_indices(
+            o3d.utility.Vector3iVector(removing_indices))
         print("Adding %d indices" % len(removing_indices))
-        voxel_load_copy.add_voxel_using_indices(o3d.utility.Vector3iVector(removing_indices))
+        voxel_load_copy.add_voxel_using_indices(
+            o3d.utility.Vector3iVector(removing_indices))
         o3d.visualization.draw_geometries([voxel_load_copy])
 
         print("Retireve all available 3D coordiante of voxels")
@@ -133,11 +135,13 @@ if __name__ == "__main__":
 
         print("Remove and add voxels")
         voxel_load_copy = copy.copy(voxel_load)
-        removing_coordinates = coordinates[:len(indices)//2]
+        removing_coordinates = coordinates[:len(indices) // 2]
         print("Removing %d indices" % len(removing_coordinates))
-        voxel_load_copy.remove_voxel_using_coordinates(o3d.utility.Vector3dVector(removing_coordinates))
+        voxel_load_copy.remove_voxel_using_coordinates(
+            o3d.utility.Vector3dVector(removing_coordinates))
         print("Adding %d indices" % len(removing_coordinates))
-        voxel_load_copy.add_voxel_using_coordinates(o3d.utility.Vector3dVector(removing_coordinates))
-        o3d.visualization.draw_geometries([voxel_load_copy])        
+        voxel_load_copy.add_voxel_using_coordinates(
+            o3d.utility.Vector3dVector(removing_coordinates))
+        o3d.visualization.draw_geometries([voxel_load_copy])
 
         print("")

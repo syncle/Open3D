@@ -103,13 +103,14 @@ void pybind_voxelgrid(py::module &m) {
                  &geometry::VoxelGrid::AddVoxelUsingIndices, "indices"_a,
                  "Add voxels using their voxel indices.")
             .def("add_voxel_using_coordinates",
-                 &geometry::VoxelGrid::AddVoxelUsingCoordinates, "coordinates"_a,
-                 "Add voxels using their voxel coordinates.")
+                 &geometry::VoxelGrid::AddVoxelUsingCoordinates,
+                 "coordinates"_a, "Add voxels using their voxel coordinates.")
             .def("remove_voxel_using_indices",
                  &geometry::VoxelGrid::RemoveVoxelUsingIndices, "indices"_a,
                  "Remove voxels using their voxel indices.")
             .def("remove_voxel_using_coordinates",
-                 &geometry::VoxelGrid::RemoveVoxelUsingCoordinates, "coordinates"_a,
+                 &geometry::VoxelGrid::RemoveVoxelUsingCoordinates,
+                 "coordinates"_a,
                  "Remove voxels using their voxel coordinates.")
             .def("check_if_included", &geometry::VoxelGrid::CheckIfIncluded,
                  "queries"_a,

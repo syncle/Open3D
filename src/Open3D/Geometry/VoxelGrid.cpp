@@ -224,8 +224,7 @@ void VoxelGrid::AddVoxel(const Eigen::Vector3i &grid_index) {
 }
 
 void VoxelGrid::RemoveVoxel(const Eigen::Vector3i &grid_index) {
-    if (voxels_.count(grid_index) > 0)
-        voxels_.erase(grid_index);
+    if (voxels_.count(grid_index) > 0) voxels_.erase(grid_index);
 }
 
 std::vector<Eigen::Vector3i> VoxelGrid::GetAllVoxelIndices() {
@@ -248,24 +247,28 @@ std::vector<Eigen::Vector3d> VoxelGrid::GetAllVoxelCoordinates() {
     return output;
 }
 
-void VoxelGrid::AddVoxelUsingIndices(const std::vector<Eigen::Vector3i> &indices) {
+void VoxelGrid::AddVoxelUsingIndices(
+        const std::vector<Eigen::Vector3i> &indices) {
     for (auto &it : indices) {
         AddVoxel(it);
     }
 }
 
-void VoxelGrid::AddVoxelUsingCoordinates(const std::vector<Eigen::Vector3d> &coordinates) {
+void VoxelGrid::AddVoxelUsingCoordinates(
+        const std::vector<Eigen::Vector3d> &coordinates) {
     for (auto &it : coordinates) {
         AddVoxel(GetVoxelGridIndex(it));
     }
 }
 
-void VoxelGrid::RemoveVoxelUsingIndices(const std::vector<Eigen::Vector3i> &grid_indices) {
+void VoxelGrid::RemoveVoxelUsingIndices(
+        const std::vector<Eigen::Vector3i> &grid_indices) {
     for (auto &it : grid_indices) {
         RemoveVoxel(it);
     }
 }
-void VoxelGrid::RemoveVoxelUsingCoordinates(const std::vector<Eigen::Vector3d> &coordinates) {
+void VoxelGrid::RemoveVoxelUsingCoordinates(
+        const std::vector<Eigen::Vector3d> &coordinates) {
     for (auto &it : coordinates) {
         RemoveVoxel(GetVoxelGridIndex(it));
     }

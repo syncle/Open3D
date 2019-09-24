@@ -141,7 +141,8 @@ public:
     void RemoveVoxelUsingIndices(const std::vector<Eigen::Vector3i> &voxels);
 
     /// Experimental function for removing voxels using coordinates
-    void RemoveVoxelUsingCoordinates(const std::vector<Eigen::Vector3d> &voxels);
+    void RemoveVoxelUsingCoordinates(
+            const std::vector<Eigen::Vector3d> &voxels);
 
     /// Return a vector of 3D coordinates that define the indexed voxel cube.
     std::vector<Eigen::Vector3d> GetVoxelBoundingPoints(
