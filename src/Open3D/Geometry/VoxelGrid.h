@@ -103,7 +103,7 @@ public:
     Eigen::Vector3i GetVoxelGridIndex(const Eigen::Vector3d &point) const;
 
     // Function that returns the 3d coordinates of the queried voxel center
-    Eigen::Vector3d GetVoxelCenterCoordinate(Eigen::Vector3i idx) const {
+    Eigen::Vector3d GetVoxelCenterCoordinate(const Eigen::Vector3i &idx) const {
         auto it = voxels_.find(idx);
         if (it != voxels_.end()) {
             const auto &grid_index = it->first;
@@ -122,7 +122,7 @@ public:
 
     /// Return a vector of 3D coordinates that define the indexed voxel cube.
     std::vector<Eigen::Vector3d> GetVoxelBoundingPoints(
-            Eigen::Vector3i index) const;
+            const Eigen::Vector3i &index) const;
 
     // Element-wise check if a query in the list is included in the VoxelGrid
     // Queries are double precision and are mapped to the closest voxel.
