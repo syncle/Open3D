@@ -8,6 +8,7 @@ import time
 import open3d as o3d
 import numpy as np
 import numpy.matlib
+import copy
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(dir_path, '../Misc'))
@@ -41,7 +42,7 @@ def mesh_generator():
         open3d.geometry.TriangleMesh: yielded mesh 
     """
     yield meshes.armadillo()
-    yield meshes.bunny()
+    # yield meshes.bunny()
 
 
 if __name__ == "__main__":
@@ -49,7 +50,7 @@ if __name__ == "__main__":
     for mesh in mesh_generator():
         print("Normalize mesh")
         mesh = preprocess(mesh)
-        o3d.visualization.draw_geometries([mesh])
+        # o3d.visualization.draw_geometries([mesh])
         print("")
 
         print("Sample uniform points")
@@ -70,7 +71,8 @@ if __name__ == "__main__":
         print("")
 
         print("visualize voxel grid")
-        o3d.visualization.draw_geometries([voxel])
+        o3d.visualization.draw_geometr
+        ies([voxel])
         print("")
 
         print("Save and load voxel grid")
@@ -110,4 +112,32 @@ if __name__ == "__main__":
         print(octree)
         print("took %.2f milliseconds" % ((time.time() - start) * 1000.0))
         o3d.visualization.draw_geometries([octree])
+        print("")
+
+        print("Retireve all available voxel indices")
+        indices = np.asarray(voxel_load.get_all_voxel_indices())
+        print(indices)
+        
+        print("Remove and add voxels")
+        voxel_load_copy = copy.copy(voxel_load)
+        removing_indices = indices[:len(indices)//2]
+        print("Removing %d indices" % len(removing_indices))
+        voxel_load_copy.remove_voxel_using_indices(o3d.utility.Vector3iVector(removing_indices))
+        print("Adding %d indices" % len(removing_indices))
+        voxel_load_copy.add_voxel_using_indices(o3d.utility.Vector3iVector(removing_indices))
+        o3d.visualization.draw_geometries([voxel_load_copy])
+
+        print("Retireve all available 3D coordiante of voxels")
+        coordinates = np.asarray(voxel_load.get_all_voxel_coordinates())
+        print(coordinates)
+
+        print("Remove and add voxels")
+        voxel_load_copy = copy.copy(voxel_load)
+        removing_coordinates = coordinates[:len(indices)//2]
+        print("Removing %d indices" % len(removing_coordinates))
+        voxel_load_copy.remove_voxel_using_coordinates(o3d.utility.Vector3dVector(removing_coordinates))
+        print("Adding %d indices" % len(removing_coordinates))
+        voxel_load_copy.add_voxel_using_coordinates(o3d.utility.Vector3dVector(removing_coordinates))
+        o3d.visualization.draw_geometries([voxel_load_copy])        
+
         print("")

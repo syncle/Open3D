@@ -93,6 +93,24 @@ void pybind_voxelgrid(py::module &m) {
             .def("get_voxel_grid_index",
                  &geometry::VoxelGrid::GetVoxelGridIndex, "point"_a,
                  "Returns voxel grid index given query point.")
+            .def("get_all_voxel_indices",
+                 &geometry::VoxelGrid::GetAllVoxelIndices,
+                 "Returns indices of all voxels.")
+            .def("get_all_voxel_coordinates",
+                 &geometry::VoxelGrid::GetAllVoxelCoordinates,
+                 "Returns 3D coordinates of all voxels.")
+            .def("add_voxel_using_indices",
+                 &geometry::VoxelGrid::AddVoxelUsingIndices, "indices"_a,
+                 "Add voxels using their voxel indices.")
+            .def("add_voxel_using_coordinates",
+                 &geometry::VoxelGrid::AddVoxelUsingCoordinates, "coordinates"_a,
+                 "Add voxels using their voxel coordinates.")
+            .def("remove_voxel_using_indices",
+                 &geometry::VoxelGrid::RemoveVoxelUsingIndices, "indices"_a,
+                 "Remove voxels using their voxel indices.")
+            .def("remove_voxel_using_coordinates",
+                 &geometry::VoxelGrid::RemoveVoxelUsingCoordinates, "coordinates"_a,
+                 "Remove voxels using their voxel coordinates.")
             .def("check_if_included", &geometry::VoxelGrid::CheckIfIncluded,
                  "queries"_a,
                  "Element-wise check if a query in the list is included in "

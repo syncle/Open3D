@@ -116,9 +116,32 @@ public:
         }
     }
 
-    /// Add a voxel with specified grid index and color
+    /// Add a voxel with specified grid index
     void AddVoxel(const Eigen::Vector3i &grid_index);
+
+    /// Add a voxel with specified grid index and VoxelData
     void AddVoxel(const Eigen::Vector3i &grid_index, const VoxelData &voxel);
+
+    /// Remove a voxel with specified grid index
+    void RemoveVoxel(const Eigen::Vector3i &grid_index);
+
+    /// Experimental function for retrieve all indices of voxels
+    std::vector<Eigen::Vector3i> GetAllVoxelIndices();
+
+    /// Experimental function for retrieve all center coordinate of voxels
+    std::vector<Eigen::Vector3d> GetAllVoxelCoordinates();
+
+    /// Experimental function for adding more voxels using indices
+    void AddVoxelUsingIndices(const std::vector<Eigen::Vector3i> &voxels);
+
+    /// Experimental function for adding more voxels using voxel coordinates
+    void AddVoxelUsingCoordinates(const std::vector<Eigen::Vector3d> &voxels);
+
+    /// Experimental function for removing voxels using indices
+    void RemoveVoxelUsingIndices(const std::vector<Eigen::Vector3i> &voxels);
+
+    /// Experimental function for removing voxels using coordinates
+    void RemoveVoxelUsingCoordinates(const std::vector<Eigen::Vector3d> &voxels);
 
     /// Return a vector of 3D coordinates that define the indexed voxel cube.
     std::vector<Eigen::Vector3d> GetVoxelBoundingPoints(
