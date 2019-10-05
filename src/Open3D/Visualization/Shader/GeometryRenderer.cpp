@@ -181,6 +181,71 @@ bool LineSetRenderer::UpdateGeometry() {
     return true;
 }
 
+bool TetraMeshRenderer::Render(const RenderOption &option,
+                               const ViewControl &view) {
+    if (is_visible_ == false || geometry_ptr_->IsEmpty()) return true;
+    return simple_tetramesh_shader_.Render(*geometry_ptr_, option, view);
+}
+
+bool TetraMeshRenderer::AddGeometry(
+        std::shared_ptr<const geometry::Geometry> geometry_ptr) {
+    if (geometry_ptr->GetGeometryType() !=
+        geometry::Geometry::GeometryType::TetraMesh) {
+        return false;
+    }
+    geometry_ptr_ = geometry_ptr;
+    return UpdateGeometry();
+}
+
+bool TetraMeshRenderer::UpdateGeometry() {
+    simple_tetramesh_shader_.InvalidateGeometry();
+    return true;
+}
+
+bool OrientedBoundingBoxRenderer::Render(const RenderOption &option,
+                                         const ViewControl &view) {
+    if (is_visible_ == false || geometry_ptr_->IsEmpty()) return true;
+    return simple_oriented_bounding_box_shader_.Render(*geometry_ptr_, option,
+                                                       view);
+}
+
+bool OrientedBoundingBoxRenderer::AddGeometry(
+        std::shared_ptr<const geometry::Geometry> geometry_ptr) {
+    if (geometry_ptr->GetGeometryType() !=
+        geometry::Geometry::GeometryType::OrientedBoundingBox) {
+        return false;
+    }
+    geometry_ptr_ = geometry_ptr;
+    return UpdateGeometry();
+}
+
+bool OrientedBoundingBoxRenderer::UpdateGeometry() {
+    simple_oriented_bounding_box_shader_.InvalidateGeometry();
+    return true;
+}
+
+bool AxisAlignedBoundingBoxRenderer::Render(const RenderOption &option,
+                                            const ViewControl &view) {
+    if (is_visible_ == false || geometry_ptr_->IsEmpty()) return true;
+    return simple_axis_aligned_bounding_box_shader_.Render(*geometry_ptr_,
+                                                           option, view);
+}
+
+bool AxisAlignedBoundingBoxRenderer::AddGeometry(
+        std::shared_ptr<const geometry::Geometry> geometry_ptr) {
+    if (geometry_ptr->GetGeometryType() !=
+        geometry::Geometry::GeometryType::AxisAlignedBoundingBox) {
+        return false;
+    }
+    geometry_ptr_ = geometry_ptr;
+    return UpdateGeometry();
+}
+
+bool AxisAlignedBoundingBoxRenderer::UpdateGeometry() {
+    simple_axis_aligned_bounding_box_shader_.InvalidateGeometry();
+    return true;
+}
+
 bool TriangleMeshRenderer::Render(const RenderOption &option,
                                   const ViewControl &view) {
     if (is_visible_ == false || geometry_ptr_->IsEmpty()) return true;
@@ -190,11 +255,20 @@ bool TriangleMeshRenderer::Render(const RenderOption &option,
         if (option.mesh_color_option_ ==
             RenderOption::MeshColorOption::Normal) {
             success &= normal_mesh_shader_.Render(mesh, option, view);
+        } else if (option.mesh_color_option_ ==
+                           RenderOption::MeshColorOption::Color &&
+                   mesh.HasTriangleUvs() && mesh.HasTexture()) {
+            success &= texture_phong_mesh_shader_.Render(mesh, option, view);
         } else {
             success &= phong_mesh_shader_.Render(mesh, option, view);
         }
-    } else {
-        success &= simple_mesh_shader_.Render(mesh, option, view);
+    } else {  // if normals are not ready
+        if (option.mesh_color_option_ == RenderOption::MeshColorOption::Color &&
+            mesh.HasTriangleUvs() && mesh.HasTexture()) {
+            success &= texture_simple_mesh_shader_.Render(mesh, option, view);
+        } else {
+            success &= simple_mesh_shader_.Render(mesh, option, view);
+        }
     }
     if (option.mesh_show_wireframe_) {
         success &= simpleblack_wireframe_shader_.Render(mesh, option, view);
@@ -216,7 +290,9 @@ bool TriangleMeshRenderer::AddGeometry(
 
 bool TriangleMeshRenderer::UpdateGeometry() {
     simple_mesh_shader_.InvalidateGeometry();
+    texture_simple_mesh_shader_.InvalidateGeometry();
     phong_mesh_shader_.InvalidateGeometry();
+    texture_phong_mesh_shader_.InvalidateGeometry();
     normal_mesh_shader_.InvalidateGeometry();
     simpleblack_wireframe_shader_.InvalidateGeometry();
     return true;
@@ -240,6 +316,27 @@ bool ImageRenderer::AddGeometry(
 
 bool ImageRenderer::UpdateGeometry() {
     image_shader_.InvalidateGeometry();
+    return true;
+}
+
+bool RGBDImageRenderer::Render(const RenderOption &option,
+                               const ViewControl &view) {
+    if (!is_visible_ || geometry_ptr_->IsEmpty()) return true;
+    return rgbd_image_shader_.Render(*geometry_ptr_, option, view);
+}
+
+bool RGBDImageRenderer::AddGeometry(
+        std::shared_ptr<const geometry::Geometry> geometry_ptr) {
+    if (geometry_ptr->GetGeometryType() !=
+        geometry::Geometry::GeometryType::RGBDImage) {
+        return false;
+    }
+    geometry_ptr_ = geometry_ptr;
+    return UpdateGeometry();
+}
+
+bool RGBDImageRenderer::UpdateGeometry() {
+    rgbd_image_shader_.InvalidateGeometry();
     return true;
 }
 
@@ -314,7 +411,7 @@ bool PointCloudPickerRenderer::Render(const RenderOption &option,
         size_t index = picker.picked_indices_[i];
         if (index < pointcloud.points_.size()) {
             auto sphere = geometry::TriangleMesh::CreateSphere(
-                    view.GetBoundingBox().GetSize() *
+                    view.GetBoundingBox().GetMaxExtend() *
                     _option.pointcloud_picker_sphere_size_);
             sphere->ComputeVertexNormals();
             sphere->vertex_colors_.clear();

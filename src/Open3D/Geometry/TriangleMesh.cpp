@@ -25,6 +25,7 @@
 // ----------------------------------------------------------------------------
 
 #include "Open3D/Geometry/TriangleMesh.h"
+#include "Open3D/Geometry/BoundingVolume.h"
 #include "Open3D/Geometry/IntersectionTest.h"
 #include "Open3D/Geometry/KDTreeFlann.h"
 #include "Open3D/Geometry/PointCloud.h"
@@ -42,131 +43,36 @@ namespace open3d {
 namespace geometry {
 
 TriangleMesh &TriangleMesh::Clear() {
-    vertices_.clear();
-    vertex_normals_.clear();
-    vertex_colors_.clear();
+    MeshBase::Clear();
     triangles_.clear();
     triangle_normals_.clear();
     adjacency_list_.clear();
+    triangle_uvs_.clear();
+    texture_.Clear();
     return *this;
-}
-
-bool TriangleMesh::IsEmpty() const { return !HasVertices(); }
-
-Eigen::Vector3d TriangleMesh::GetMinBound() const {
-    if (!HasVertices()) {
-        return Eigen::Vector3d(0.0, 0.0, 0.0);
-    }
-    return std::accumulate(
-            vertices_.begin(), vertices_.end(), vertices_[0],
-            [](const Eigen::Vector3d &a, const Eigen::Vector3d &b) {
-                return a.array().min(b.array()).matrix();
-            });
-}
-
-Eigen::Vector3d TriangleMesh::GetMaxBound() const {
-    if (!HasVertices()) {
-        return Eigen::Vector3d(0.0, 0.0, 0.0);
-    }
-    return std::accumulate(
-            vertices_.begin(), vertices_.end(), vertices_[0],
-            [](const Eigen::Vector3d &a, const Eigen::Vector3d &b) {
-                return a.array().max(b.array()).matrix();
-            });
 }
 
 TriangleMesh &TriangleMesh::Transform(const Eigen::Matrix4d &transformation) {
-    for (auto &vertex : vertices_) {
-        Eigen::Vector4d new_point =
-                transformation *
-                Eigen::Vector4d(vertex(0), vertex(1), vertex(2), 1.0);
-        vertex = new_point.block<3, 1>(0, 0);
-    }
-    for (auto &vertex_normal : vertex_normals_) {
-        Eigen::Vector4d new_normal =
-                transformation * Eigen::Vector4d(vertex_normal(0),
-                                                 vertex_normal(1),
-                                                 vertex_normal(2), 0.0);
-        vertex_normal = new_normal.block<3, 1>(0, 0);
-    }
-    for (auto &triangle_normal : triangle_normals_) {
-        Eigen::Vector4d new_normal =
-                transformation * Eigen::Vector4d(triangle_normal(0),
-                                                 triangle_normal(1),
-                                                 triangle_normal(2), 0.0);
-        triangle_normal = new_normal.block<3, 1>(0, 0);
-    }
-    return *this;
-}
-
-TriangleMesh &TriangleMesh::Translate(const Eigen::Vector3d &translation) {
-    for (auto &vertex : vertices_) {
-        vertex += translation;
-    }
-    return *this;
-}
-
-TriangleMesh &TriangleMesh::Scale(const double scale, bool center) {
-    Eigen::Vector3d vertex_center(0, 0, 0);
-    if (center && !vertices_.empty()) {
-        vertex_center = std::accumulate(vertices_.begin(), vertices_.end(),
-                                        vertex_center);
-        vertex_center /= double(vertices_.size());
-    }
-    for (auto &vertex : vertices_) {
-        vertex = (vertex - vertex_center) * scale + vertex_center;
-    }
+    MeshBase::Transform(transformation);
+    TransformNormals(transformation, triangle_normals_);
     return *this;
 }
 
 TriangleMesh &TriangleMesh::Rotate(const Eigen::Vector3d &rotation,
                                    bool center,
                                    RotationType type) {
-    Eigen::Vector3d vertex_center(0, 0, 0);
-    if (center && !vertices_.empty()) {
-        vertex_center = std::accumulate(vertices_.begin(), vertices_.end(),
-                                        vertex_center);
-        vertex_center /= double(vertices_.size());
-    }
-    const Eigen::Matrix3d R = GetRotationMatrix(rotation, type);
-    for (auto &vertex : vertices_) {
-        vertex = R * (vertex - vertex_center) + vertex_center;
-    }
-    for (auto &normal : vertex_normals_) {
-        normal = R * normal;
-    }
-    for (auto &normal : triangle_normals_) {
-        normal = R * normal;
-    }
+    MeshBase::Rotate(rotation, center, type);
+    RotateNormals(rotation, triangle_normals_, center, type);
     return *this;
 }
 
 TriangleMesh &TriangleMesh::operator+=(const TriangleMesh &mesh) {
     if (mesh.IsEmpty()) return (*this);
     size_t old_vert_num = vertices_.size();
-    size_t add_vert_num = mesh.vertices_.size();
-    size_t new_vert_num = old_vert_num + add_vert_num;
+    MeshBase::operator+=(mesh);
     size_t old_tri_num = triangles_.size();
     size_t add_tri_num = mesh.triangles_.size();
     size_t new_tri_num = old_tri_num + add_tri_num;
-    if ((!HasVertices() || HasVertexNormals()) && mesh.HasVertexNormals()) {
-        vertex_normals_.resize(new_vert_num);
-        for (size_t i = 0; i < add_vert_num; i++)
-            vertex_normals_[old_vert_num + i] = mesh.vertex_normals_[i];
-    } else {
-        vertex_normals_.clear();
-    }
-    if ((!HasVertices() || HasVertexColors()) && mesh.HasVertexColors()) {
-        vertex_colors_.resize(new_vert_num);
-        for (size_t i = 0; i < add_vert_num; i++)
-            vertex_colors_[old_vert_num + i] = mesh.vertex_colors_[i];
-    } else {
-        vertex_colors_.clear();
-    }
-    vertices_.resize(new_vert_num);
-    for (size_t i = 0; i < add_vert_num; i++)
-        vertices_[old_vert_num + i] = mesh.vertices_[i];
-
     if ((!HasTriangles() || HasTriangleNormals()) &&
         mesh.HasTriangleNormals()) {
         triangle_normals_.resize(new_tri_num);
@@ -183,6 +89,10 @@ TriangleMesh &TriangleMesh::operator+=(const TriangleMesh &mesh) {
     }
     if (HasAdjacencyList()) {
         ComputeAdjacencyList();
+    }
+    if (HasTriangleUvs() || HasTexture()) {
+        // TODO: implement copy
+        utility::LogWarning("copy of uvs and texture is not implemented yet\n");
     }
     return (*this);
 }
@@ -782,6 +692,12 @@ TriangleMesh &TriangleMesh::RemoveDuplicatedVertices() {
 }
 
 TriangleMesh &TriangleMesh::RemoveDuplicatedTriangles() {
+    if (HasTriangleUvs()) {
+        utility::LogWarning(
+                "[RemoveDuplicatedTriangles] This mesh contains triangle uvs "
+                "that are not handled "
+                "in this function\n");
+    }
     typedef std::tuple<int, int, int> Index3;
     std::unordered_map<Index3, size_t, utility::hash_tuple::hash<Index3>>
             triangle_to_old_index;
@@ -872,6 +788,12 @@ TriangleMesh &TriangleMesh::RemoveUnreferencedVertices() {
 }
 
 TriangleMesh &TriangleMesh::RemoveDegenerateTriangles() {
+    if (HasTriangleUvs()) {
+        utility::LogWarning(
+                "[RemoveDegenerateTriangles] This mesh contains triangle uvs "
+                "that are not handled "
+                "in this function\n");
+    }
     bool has_tri_normal = HasTriangleNormals();
     size_t old_triangle_num = triangles_.size();
     size_t k = 0;
@@ -897,6 +819,12 @@ TriangleMesh &TriangleMesh::RemoveDegenerateTriangles() {
 }
 
 TriangleMesh &TriangleMesh::RemoveNonManifoldEdges() {
+    if (HasTriangleUvs()) {
+        utility::LogWarning(
+                "[RemoveNonManifoldEdges] This mesh contains triangle uvs that "
+                "are not handled "
+                "in this function\n");
+    }
     std::vector<double> triangle_areas;
     GetSurfaceArea(triangle_areas);
 
@@ -968,6 +896,86 @@ TriangleMesh &TriangleMesh::RemoveNonManifoldEdges() {
             triangle_normals_.resize(to_tidx);
         }
     }
+    return *this;
+}
+
+TriangleMesh &TriangleMesh::MergeCloseVertices(double eps) {
+    KDTreeFlann kdtree(*this);
+    // precompute all neighbours
+    utility::LogDebug("Precompute Neighbours\n");
+    std::vector<std::vector<int>> nbs(vertices_.size());
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+    for (int idx = 0; idx < int(vertices_.size()); ++idx) {
+        std::vector<double> dists2;
+        kdtree.SearchRadius(vertices_[idx], eps, nbs[idx], dists2);
+    }
+    utility::LogDebug("Done Precompute Neighbours\n");
+
+    bool has_vertex_normals = HasVertexNormals();
+    bool has_vertex_colors = HasVertexColors();
+    std::vector<Eigen::Vector3d> new_vertices;
+    std::vector<Eigen::Vector3d> new_vertex_normals;
+    std::vector<Eigen::Vector3d> new_vertex_colors;
+    std::unordered_map<int, int> new_vert_mapping;
+    for (int vidx = 0; vidx < int(vertices_.size()); ++vidx) {
+        if (new_vert_mapping.count(vidx) > 0) {
+            continue;
+        }
+
+        int new_vidx = int(new_vertices.size());
+        new_vert_mapping[vidx] = new_vidx;
+
+        Eigen::Vector3d vertex = vertices_[vidx];
+        Eigen::Vector3d normal;
+        if (has_vertex_normals) {
+            normal = vertex_normals_[vidx];
+        }
+        Eigen::Vector3d color;
+        if (has_vertex_colors) {
+            color = vertex_colors_[vidx];
+        }
+        int n = 1;
+        for (int nb : nbs[vidx]) {
+            if (vidx == nb || new_vert_mapping.count(nb) > 0) {
+                continue;
+            }
+            vertex += vertices_[nb];
+            if (has_vertex_normals) {
+                normal += vertex_normals_[nb];
+            }
+            if (has_vertex_colors) {
+                color += vertex_colors_[nb];
+            }
+            new_vert_mapping[nb] = new_vidx;
+            n += 1;
+        }
+        new_vertices.push_back(vertex / n);
+        if (has_vertex_normals) {
+            new_vertex_normals.push_back(normal / n);
+        }
+        if (has_vertex_colors) {
+            new_vertex_colors.push_back(color / n);
+        }
+    }
+    utility::LogDebug("Merged {} vertices\n",
+                      vertices_.size() - new_vertices.size());
+
+    std::swap(vertices_, new_vertices);
+    std::swap(vertex_normals_, new_vertex_normals);
+    std::swap(vertex_colors_, new_vertex_colors);
+
+    for (auto &triangle : triangles_) {
+        triangle(0) = new_vert_mapping[triangle(0)];
+        triangle(1) = new_vert_mapping[triangle(1)];
+        triangle(2) = new_vert_mapping[triangle(2)];
+    }
+
+    if (HasTriangleNormals()) {
+        ComputeTriangleNormals();
+    }
+
     return *this;
 }
 
@@ -1347,10 +1355,6 @@ bool TriangleMesh::IsIntersecting(const TriangleMesh &other) const {
         }
     }
     return false;
-}
-
-std::shared_ptr<TriangleMesh> TriangleMesh::ComputeConvexHull() const {
-    return Qhull::ComputeConvexHull(vertices_);
 }
 
 }  // namespace geometry

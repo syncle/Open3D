@@ -25,6 +25,7 @@
 // ----------------------------------------------------------------------------
 
 #include "Open3D/Geometry/Octree.h"
+#include "Open3D/Geometry/BoundingVolume.h"
 
 #include <json/json.h>
 #include <Eigen/Dense>
@@ -353,12 +354,28 @@ Eigen::Vector3d Octree::GetMaxBound() const {
     }
 }
 
+Eigen::Vector3d Octree::GetCenter() const {
+    return origin_ + Eigen::Vector3d(size_, size_, size_) / 2;
+}
+
+AxisAlignedBoundingBox Octree::GetAxisAlignedBoundingBox() const {
+    AxisAlignedBoundingBox box;
+    box.min_bound_ = GetMinBound();
+    box.max_bound_ = GetMaxBound();
+    return box;
+}
+
+OrientedBoundingBox Octree::GetOrientedBoundingBox() const {
+    return OrientedBoundingBox::CreateFromAxisAlignedBoundingBox(
+            GetAxisAlignedBoundingBox());
+}
+
 Octree& Octree::Transform(const Eigen::Matrix4d& transformation) {
     throw std::runtime_error("Not implemented");
     return *this;
 }
 
-Octree& Octree::Translate(const Eigen::Vector3d& translation) {
+Octree& Octree::Translate(const Eigen::Vector3d& translation, bool relative) {
     throw std::runtime_error("Not implemented");
     return *this;
 }
@@ -597,14 +614,14 @@ void Octree::CreateFromVoxelGrid(const geometry::VoxelGrid& voxel_grid) {
     origin_ = voxel_grid.origin_;
     size_ = (voxel_grid.GetMaxBound() - origin_).maxCoeff();
     double half_voxel_size = voxel_grid.voxel_size_ / 2.;
-    for (size_t vid = 0; vid < voxel_grid.voxels_.size(); ++vid) {
-        Eigen::Vector3d mid_point =
-                half_voxel_size + origin_.array() +
-                voxel_grid.voxels_[vid].grid_index_.array().cast<double>() *
-                        voxel_grid.voxel_size_;
-        InsertPoint(mid_point, geometry::OctreeColorLeafNode::GetInitFunction(),
-                    geometry::OctreeColorLeafNode::GetUpdateFunction(
-                            voxel_grid.voxels_[vid].color_));
+    for (const auto& voxel_iter : voxel_grid.voxels_) {
+        const geometry::Voxel& voxel = voxel_iter.second;
+        Eigen::Vector3d mid_point = half_voxel_size + origin_.array() +
+                                    voxel.grid_index_.array().cast<double>() *
+                                            voxel_grid.voxel_size_;
+        InsertPoint(
+                mid_point, geometry::OctreeColorLeafNode::GetInitFunction(),
+                geometry::OctreeColorLeafNode::GetUpdateFunction(voxel.color_));
     }
 }
 

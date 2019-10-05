@@ -24,12 +24,20 @@
 # IN THE SOFTWARE.
 # ----------------------------------------------------------------------------
 
+try:
+    # Azure Kinect is not officially supported on Ubuntu 16.04, this is an
+    # unofficial workaround. Install the fix package with
+    # `pip install open3d_azure_kinect_ubuntu1604_fix`
+    import open3d_azure_kinect_ubuntu1604_fix
+except:
+    pass
+
 from .open3d import * # py2 py3 compatible
 
 __version__ = '@PROJECT_VERSION@'
 
 if "@ENABLE_JUPYTER@" == "ON":
-    from open3d.j_visualizer import *
+    from .j_visualizer import *
 
     def _jupyter_nbextension_paths():
         return [{

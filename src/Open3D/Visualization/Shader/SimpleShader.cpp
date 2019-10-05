@@ -26,9 +26,11 @@
 
 #include "Open3D/Visualization/Shader/SimpleShader.h"
 
+#include "Open3D/Geometry/BoundingVolume.h"
 #include "Open3D/Geometry/LineSet.h"
 #include "Open3D/Geometry/Octree.h"
 #include "Open3D/Geometry/PointCloud.h"
+#include "Open3D/Geometry/TetraMesh.h"
 #include "Open3D/Geometry/TriangleMesh.h"
 #include "Open3D/Geometry/VoxelGrid.h"
 #include "Open3D/Visualization/Shader/Shader.h"
@@ -262,6 +264,169 @@ bool SimpleShaderForLineSet::PrepareBinding(
     return true;
 }
 
+bool SimpleShaderForTetraMesh::PrepareRendering(
+        const geometry::Geometry &geometry,
+        const RenderOption &option,
+        const ViewControl &view) {
+    if (geometry.GetGeometryType() !=
+        geometry::Geometry::GeometryType::TetraMesh) {
+        PrintShaderWarning("Rendering type is not geometry::TetraMesh.");
+        return false;
+    }
+    glLineWidth(GLfloat(option.line_width_));
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    return true;
+}
+
+bool SimpleShaderForTetraMesh::PrepareBinding(
+        const geometry::Geometry &geometry,
+        const RenderOption &option,
+        const ViewControl &view,
+        std::vector<Eigen::Vector3f> &points,
+        std::vector<Eigen::Vector3f> &colors) {
+    typedef decltype(geometry::TetraMesh::tetras_)::value_type TetraIndices;
+    typedef decltype(geometry::TetraMesh::tetras_)::value_type::Scalar Index;
+    typedef std::tuple<Index, Index> Index2;
+
+    if (geometry.GetGeometryType() !=
+        geometry::Geometry::GeometryType::TetraMesh) {
+        PrintShaderWarning("Rendering type is not geometry::TetraMesh.");
+        return false;
+    }
+    const geometry::TetraMesh &tetramesh =
+            (const geometry::TetraMesh &)geometry;
+    if (tetramesh.HasTetras() == false) {
+        PrintShaderWarning("Binding failed with empty geometry::TetraMesh.");
+        return false;
+    }
+
+    std::unordered_set<Index2, utility::hash_tuple::hash<Index2>>
+            inserted_edges;
+    auto InsertEdge = [&](Index vidx0, Index vidx1) {
+        Index2 edge(std::min(vidx0, vidx1), std::max(vidx0, vidx1));
+        if (inserted_edges.count(edge) == 0) {
+            inserted_edges.insert(edge);
+            Eigen::Vector3f p0 = tetramesh.vertices_[vidx0].cast<float>();
+            Eigen::Vector3f p1 = tetramesh.vertices_[vidx1].cast<float>();
+            points.insert(points.end(), {p0, p1});
+            Eigen::Vector3f color(0, 0, 0);
+            colors.insert(colors.end(), {color, color});
+        }
+    };
+
+    for (size_t i = 0; i < tetramesh.tetras_.size(); i++) {
+        const TetraIndices tetra = tetramesh.tetras_[i];
+        InsertEdge(tetra(0), tetra(1));
+        InsertEdge(tetra(1), tetra(2));
+        InsertEdge(tetra(2), tetra(0));
+        InsertEdge(tetra(3), tetra(0));
+        InsertEdge(tetra(3), tetra(1));
+        InsertEdge(tetra(3), tetra(2));
+    }
+    draw_arrays_mode_ = GL_LINES;
+    draw_arrays_size_ = GLsizei(points.size());
+    return true;
+}
+
+bool SimpleShaderForOrientedBoundingBox::PrepareRendering(
+        const geometry::Geometry &geometry,
+        const RenderOption &option,
+        const ViewControl &view) {
+    if (geometry.GetGeometryType() !=
+        geometry::Geometry::GeometryType::OrientedBoundingBox) {
+        PrintShaderWarning(
+                "Rendering type is not geometry::OrientedBoundingBox.");
+        return false;
+    }
+    glLineWidth(GLfloat(option.line_width_));
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    return true;
+}
+
+bool SimpleShaderForOrientedBoundingBox::PrepareBinding(
+        const geometry::Geometry &geometry,
+        const RenderOption &option,
+        const ViewControl &view,
+        std::vector<Eigen::Vector3f> &points,
+        std::vector<Eigen::Vector3f> &colors) {
+    if (geometry.GetGeometryType() !=
+        geometry::Geometry::GeometryType::OrientedBoundingBox) {
+        PrintShaderWarning(
+                "Rendering type is not geometry::OrientedBoundingBox.");
+        return false;
+    }
+    auto lineset = geometry::LineSet::CreateFromOrientedBoundingBox(
+            (const geometry::OrientedBoundingBox &)geometry);
+    points.resize(lineset->lines_.size() * 2);
+    colors.resize(lineset->lines_.size() * 2);
+    for (size_t i = 0; i < lineset->lines_.size(); i++) {
+        const auto point_pair = lineset->GetLineCoordinate(i);
+        points[i * 2] = point_pair.first.cast<float>();
+        points[i * 2 + 1] = point_pair.second.cast<float>();
+        Eigen::Vector3d color;
+        if (lineset->HasColors()) {
+            color = lineset->colors_[i];
+        } else {
+            color = Eigen::Vector3d::Zero();
+        }
+        colors[i * 2] = colors[i * 2 + 1] = color.cast<float>();
+    }
+    draw_arrays_mode_ = GL_LINES;
+    draw_arrays_size_ = GLsizei(points.size());
+    return true;
+}
+
+bool SimpleShaderForAxisAlignedBoundingBox::PrepareRendering(
+        const geometry::Geometry &geometry,
+        const RenderOption &option,
+        const ViewControl &view) {
+    if (geometry.GetGeometryType() !=
+        geometry::Geometry::GeometryType::AxisAlignedBoundingBox) {
+        PrintShaderWarning(
+                "Rendering type is not geometry::AxisAlignedBoundingBox.");
+        return false;
+    }
+    glLineWidth(GLfloat(option.line_width_));
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    return true;
+}
+
+bool SimpleShaderForAxisAlignedBoundingBox::PrepareBinding(
+        const geometry::Geometry &geometry,
+        const RenderOption &option,
+        const ViewControl &view,
+        std::vector<Eigen::Vector3f> &points,
+        std::vector<Eigen::Vector3f> &colors) {
+    if (geometry.GetGeometryType() !=
+        geometry::Geometry::GeometryType::AxisAlignedBoundingBox) {
+        PrintShaderWarning(
+                "Rendering type is not geometry::AxisAlignedBoundingBox.");
+        return false;
+    }
+    auto lineset = geometry::LineSet::CreateFromAxisAlignedBoundingBox(
+            (const geometry::AxisAlignedBoundingBox &)geometry);
+    points.resize(lineset->lines_.size() * 2);
+    colors.resize(lineset->lines_.size() * 2);
+    for (size_t i = 0; i < lineset->lines_.size(); i++) {
+        const auto point_pair = lineset->GetLineCoordinate(i);
+        points[i * 2] = point_pair.first.cast<float>();
+        points[i * 2 + 1] = point_pair.second.cast<float>();
+        Eigen::Vector3d color;
+        if (lineset->HasColors()) {
+            color = lineset->colors_[i];
+        } else {
+            color = Eigen::Vector3d::Zero();
+        }
+        colors[i * 2] = colors[i * 2 + 1] = color.cast<float>();
+    }
+    draw_arrays_mode_ = GL_LINES;
+    draw_arrays_size_ = GLsizei(points.size());
+    return true;
+}
+
 bool SimpleShaderForTriangleMesh::PrepareRendering(
         const geometry::Geometry &geometry,
         const RenderOption &option,
@@ -386,16 +551,15 @@ bool SimpleShaderForVoxelGridLine::PrepareBinding(
         return false;
     }
     const ColorMap &global_color_map = *GetGlobalColorMap();
-    auto num_voxels = voxel_grid.voxels_.size();
     points.clear();  // Final size: num_voxels * 12 * 2
     colors.clear();  // Final size: num_voxels * 12 * 2
 
-    for (size_t voxel_idx = 0; voxel_idx < num_voxels; voxel_idx++) {
+    for (auto &it : voxel_grid.voxels_) {
+        const geometry::Voxel &voxel = it.second;
         // 8 vertices in a voxel
         Eigen::Vector3f base_vertex =
                 voxel_grid.origin_.cast<float>() +
-                voxel_grid.voxels_[voxel_idx].grid_index_.cast<float>() *
-                        voxel_grid.voxel_size_;
+                voxel.grid_index_.cast<float>() * voxel_grid.voxel_size_;
         std::vector<Eigen::Vector3f> vertices;
         for (const Eigen::Vector3i &vertex_offset : cuboid_vertex_offsets) {
             vertices.push_back(base_vertex + vertex_offset.cast<float>() *
@@ -419,7 +583,7 @@ bool SimpleShaderForVoxelGridLine::PrepareBinding(
                 break;
             case RenderOption::MeshColorOption::Color:
                 if (voxel_grid.HasColors()) {
-                    voxel_color = voxel_grid.voxels_[voxel_idx].color_;
+                    voxel_color = voxel.color_;
                     break;
                 }
             case RenderOption::MeshColorOption::Default:
@@ -477,16 +641,15 @@ bool SimpleShaderForVoxelGridFace::PrepareBinding(
         return false;
     }
     const ColorMap &global_color_map = *GetGlobalColorMap();
-    auto num_voxels = voxel_grid.voxels_.size();
     points.clear();  // Final size: num_voxels * 36
     colors.clear();  // Final size: num_voxels * 36
 
-    for (size_t voxel_idx = 0; voxel_idx < num_voxels; voxel_idx++) {
+    for (auto &it : voxel_grid.voxels_) {
+        const geometry::Voxel &voxel = it.second;
         // 8 vertices in a voxel
         Eigen::Vector3f base_vertex =
                 voxel_grid.origin_.cast<float>() +
-                voxel_grid.voxels_[voxel_idx].grid_index_.cast<float>() *
-                        voxel_grid.voxel_size_;
+                voxel.grid_index_.cast<float>() * voxel_grid.voxel_size_;
         std::vector<Eigen::Vector3f> vertices;
         for (const Eigen::Vector3i &vertex_offset : cuboid_vertex_offsets) {
             vertices.push_back(base_vertex + vertex_offset.cast<float>() *
@@ -510,7 +673,7 @@ bool SimpleShaderForVoxelGridFace::PrepareBinding(
                 break;
             case RenderOption::MeshColorOption::Color:
                 if (voxel_grid.HasColors()) {
-                    voxel_color = voxel_grid.voxels_[voxel_idx].color_;
+                    voxel_color = voxel.color_;
                     break;
                 }
             case RenderOption::MeshColorOption::Default:
@@ -675,7 +838,6 @@ bool SimpleShaderForOctreeLine::PrepareBinding(
                      const std::shared_ptr<geometry::OctreeNode> &node,
                      const std::shared_ptr<geometry::OctreeNodeInfo> &node_info)
             -> void {
-
         Eigen::Vector3f base_vertex = node_info->origin_.cast<float>();
         std::vector<Eigen::Vector3f> vertices;
         for (const Eigen::Vector3i &vertex_offset : cuboid_vertex_offsets) {

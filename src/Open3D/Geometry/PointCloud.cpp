@@ -25,6 +25,8 @@
 // ----------------------------------------------------------------------------
 
 #include "Open3D/Geometry/PointCloud.h"
+#include "Open3D/Geometry/BoundingVolume.h"
+#include "Open3D/Geometry/TriangleMesh.h"
 
 #include <Eigen/Dense>
 #include <numeric>
@@ -46,79 +48,45 @@ PointCloud &PointCloud::Clear() {
 bool PointCloud::IsEmpty() const { return !HasPoints(); }
 
 Eigen::Vector3d PointCloud::GetMinBound() const {
-    if (!HasPoints()) {
-        return Eigen::Vector3d(0.0, 0.0, 0.0);
-    }
-    return std::accumulate(
-            points_.begin(), points_.end(), points_[0],
-            [](const Eigen::Vector3d &a, const Eigen::Vector3d &b) {
-                return a.array().min(b.array()).matrix();
-            });
+    return ComputeMinBound(points_);
 }
 
 Eigen::Vector3d PointCloud::GetMaxBound() const {
-    if (!HasPoints()) {
-        return Eigen::Vector3d(0.0, 0.0, 0.0);
-    }
-    return std::accumulate(
-            points_.begin(), points_.end(), points_[0],
-            [](const Eigen::Vector3d &a, const Eigen::Vector3d &b) {
-                return a.array().max(b.array()).matrix();
-            });
+    return ComputeMaxBound(points_);
+}
+
+Eigen::Vector3d PointCloud::GetCenter() const { return ComputeCenter(points_); }
+
+AxisAlignedBoundingBox PointCloud::GetAxisAlignedBoundingBox() const {
+    return AxisAlignedBoundingBox::CreateFromPoints(points_);
+}
+
+OrientedBoundingBox PointCloud::GetOrientedBoundingBox() const {
+    return OrientedBoundingBox::CreateFromPoints(points_);
 }
 
 PointCloud &PointCloud::Transform(const Eigen::Matrix4d &transformation) {
-    for (auto &point : points_) {
-        Eigen::Vector4d new_point =
-                transformation *
-                Eigen::Vector4d(point(0), point(1), point(2), 1.0);
-        point = new_point.block<3, 1>(0, 0);
-    }
-    for (auto &normal : normals_) {
-        Eigen::Vector4d new_normal =
-                transformation *
-                Eigen::Vector4d(normal(0), normal(1), normal(2), 0.0);
-        normal = new_normal.block<3, 1>(0, 0);
-    }
+    TransformPoints(transformation, points_);
+    TransformNormals(transformation, normals_);
     return *this;
 }
 
-PointCloud &PointCloud::Translate(const Eigen::Vector3d &translation) {
-    for (auto &point : points_) {
-        point += translation;
-    }
+PointCloud &PointCloud::Translate(const Eigen::Vector3d &translation,
+                                  bool relative) {
+    TranslatePoints(translation, points_, relative);
     return *this;
 }
 
 PointCloud &PointCloud::Scale(const double scale, bool center) {
-    Eigen::Vector3d point_center(0, 0, 0);
-    if (center && !points_.empty()) {
-        point_center =
-                std::accumulate(points_.begin(), points_.end(), point_center);
-        point_center /= double(points_.size());
-    }
-    for (auto &point : points_) {
-        point = (point - point_center) * scale + point_center;
-    }
+    ScalePoints(scale, points_, center);
     return *this;
 }
 
 PointCloud &PointCloud::Rotate(const Eigen::Vector3d &rotation,
                                bool center,
                                RotationType type) {
-    Eigen::Vector3d point_center(0, 0, 0);
-    if (center && !points_.empty()) {
-        point_center =
-                std::accumulate(points_.begin(), points_.end(), point_center);
-        point_center /= double(points_.size());
-    }
-    const Eigen::Matrix3d R = GetRotationMatrix(rotation, type);
-    for (auto &point : points_) {
-        point = R * (point - point_center) + point_center;
-    }
-    for (auto &normal : normals_) {
-        normal = R * normal;
-    }
+    RotatePoints(rotation, points_, center, type);
+    RotateNormals(rotation, normals_, center, type);
     return *this;
 }
 
@@ -279,8 +247,73 @@ std::vector<double> PointCloud::ComputeNearestNeighborDistance() const {
     return nn_dis;
 }
 
-std::shared_ptr<TriangleMesh> PointCloud::ComputeConvexHull() const {
+std::tuple<std::shared_ptr<TriangleMesh>, std::vector<size_t>>
+PointCloud::ComputeConvexHull() const {
     return Qhull::ComputeConvexHull(points_);
+}
+
+std::tuple<std::shared_ptr<TriangleMesh>, std::vector<size_t>>
+PointCloud::HiddenPointRemoval(const Eigen::Vector3d &camera_location,
+                               const double radius) const {
+    if (radius <= 0) {
+        utility::LogWarning(
+                "[HiddenPointRemoval] radius must be larger than zero.\n");
+        return std::make_tuple(std::make_shared<TriangleMesh>(),
+                               std::vector<size_t>());
+    }
+
+    // perform spherical projection
+    std::vector<Eigen::Vector3d> spherical_projection;
+    for (size_t pidx = 0; pidx < points_.size(); ++pidx) {
+        Eigen::Vector3d projected_point = points_[pidx] - camera_location;
+        double norm = projected_point.norm();
+        spherical_projection.push_back(
+                projected_point + 2 * (radius - norm) * projected_point / norm);
+    }
+
+    // add origin
+    size_t origin_pidx = spherical_projection.size();
+    spherical_projection.push_back(Eigen::Vector3d(0, 0, 0));
+
+    // calculate convex hull of spherical projection
+    std::shared_ptr<TriangleMesh> visible_mesh;
+    std::vector<size_t> pt_map;
+    std::tie(visible_mesh, pt_map) =
+            Qhull::ComputeConvexHull(spherical_projection);
+
+    // reassign original points to mesh
+    int origin_vidx = pt_map.size();
+    for (size_t vidx = 0; vidx < pt_map.size(); vidx++) {
+        size_t pidx = pt_map[vidx];
+        visible_mesh->vertices_[vidx] = points_[pidx];
+        if (pidx == origin_pidx) {
+            origin_vidx = vidx;
+            visible_mesh->vertices_[vidx] = camera_location;
+        }
+    }
+
+    // erase origin if part of mesh
+    if (origin_vidx < (int)(visible_mesh->vertices_.size())) {
+        visible_mesh->vertices_.erase(visible_mesh->vertices_.begin() +
+                                      origin_vidx);
+        pt_map.erase(pt_map.begin() + origin_vidx);
+        for (size_t tidx = visible_mesh->triangles_.size(); tidx-- > 0;) {
+            if (visible_mesh->triangles_[tidx](0) == origin_vidx ||
+                visible_mesh->triangles_[tidx](1) == origin_vidx ||
+                visible_mesh->triangles_[tidx](2) == origin_vidx) {
+                visible_mesh->triangles_.erase(
+                        visible_mesh->triangles_.begin() + tidx);
+            } else {
+                if (visible_mesh->triangles_[tidx](0) > origin_vidx)
+                    visible_mesh->triangles_[tidx](0) -= 1;
+                if (visible_mesh->triangles_[tidx](1) > origin_vidx)
+                    visible_mesh->triangles_[tidx](1) -= 1;
+                if (visible_mesh->triangles_[tidx](2) > origin_vidx)
+                    visible_mesh->triangles_[tidx](2) -= 1;
+            }
+        }
+    }
+    return std::make_tuple(visible_mesh, pt_map);
 }
 
 }  // namespace geometry

@@ -25,6 +25,7 @@
 // ----------------------------------------------------------------------------
 
 #include "Open3D/Geometry/TriangleMesh.h"
+#include "Open3D/Geometry/Image.h"
 #include "Open3D/Geometry/PointCloud.h"
 #include "Python/docstring.h"
 #include "Python/geometry/geometry.h"
@@ -34,7 +35,7 @@ using namespace open3d;
 
 void pybind_trianglemesh(py::module &m) {
     py::class_<geometry::TriangleMesh, PyGeometry3D<geometry::TriangleMesh>,
-               std::shared_ptr<geometry::TriangleMesh>, geometry::Geometry3D>
+               std::shared_ptr<geometry::TriangleMesh>, geometry::MeshBase>
             trianglemesh(m, "TriangleMesh",
                          "TriangleMesh class. Triangle mesh contains vertices "
                          "and triangles represented by the indices to the "
@@ -42,35 +43,22 @@ void pybind_trianglemesh(py::module &m) {
                          "triangle normals, vertex normals and vertex colors.");
     py::detail::bind_default_constructor<geometry::TriangleMesh>(trianglemesh);
     py::detail::bind_copy_functions<geometry::TriangleMesh>(trianglemesh);
-    py::enum_<geometry::TriangleMesh::SimplificationContraction>(
-            m, "SimplificationContraction")
-            .value("Average",
-                   geometry::TriangleMesh::SimplificationContraction::Average,
-                   "The vertex positions are computed by the averaging.")
-            .value("Quadric",
-                   geometry::TriangleMesh::SimplificationContraction::Quadric,
-                   "The vertex positions are computed by minimizing the "
-                   "distance to the adjacent triangle planes.")
-            .export_values();
-    py::enum_<geometry::TriangleMesh::FilterScope>(m, "FilterScope")
-            .value("All", geometry::TriangleMesh::FilterScope::All,
-                   "All properties (color, normal, vertex position) are "
-                   "filtered.")
-            .value("Color", geometry::TriangleMesh::FilterScope::Color,
-                   "Only the color values are filtered.")
-            .value("Normal", geometry::TriangleMesh::FilterScope::Normal,
-                   "Only the normal values are filtered.")
-            .value("Vertex", geometry::TriangleMesh::FilterScope::Vertex,
-                   "Only the vertex positions are filtered.")
-            .export_values();
     trianglemesh
             .def("__repr__",
                  [](const geometry::TriangleMesh &mesh) {
-                     return std::string("geometry::TriangleMesh with ") +
-                            std::to_string(mesh.vertices_.size()) +
-                            " points and " +
-                            std::to_string(mesh.triangles_.size()) +
-                            " triangles.";
+                     std::string info = fmt::format(
+                             "geometry::TriangleMesh with {} points and {} "
+                             "triangles",
+                             mesh.vertices_.size(), mesh.triangles_.size());
+
+                     if (mesh.HasTexture()) {
+                         info += fmt::format(", and ({}, {}) texture.",
+                                             mesh.texture_.width_,
+                                             mesh.texture_.height_);
+                     } else {
+                         info += ".";
+                     }
+                     return info;
                  })
             .def(py::self + py::self)
             .def(py::self += py::self)
@@ -113,6 +101,16 @@ void pybind_trianglemesh(py::module &m) {
                  "successively deleting  triangles with the smallest surface "
                  "area adjacent to the non-manifold edge until the number of "
                  "adjacent triangles to the edge is `<= 2`.")
+            .def("merge_close_vertices",
+                 &geometry::TriangleMesh::MergeCloseVertices,
+                 "Function that will merge close by vertices to a single one. "
+                 "The vertex position, "
+                 "normal and color will be the average of the vertices. The "
+                 "parameter eps "
+                 "defines the maximum distance of close by vertices.  This "
+                 "function might help to "
+                 "close triangle soups.",
+                 "eps"_a)
             .def("filter_sharpen", &geometry::TriangleMesh::FilterSharpen,
                  "Function to sharpen triangle mesh. The output value "
                  "(:math:`v_o`) is the input value (:math:`v_i`) plus strength "
@@ -120,7 +118,7 @@ void pybind_trianglemesh(py::module &m) {
                  ":math:`v_o = v_i x strength (v_i * |N| - \\sum_{n \\in N} "
                  "v_n)`",
                  "number_of_iterations"_a = 1, "strength"_a = 1,
-                 "filter_scope"_a = geometry::TriangleMesh::FilterScope::All)
+                 "filter_scope"_a = geometry::MeshBase::FilterScope::All)
             .def("filter_smooth_simple",
                  &geometry::TriangleMesh::FilterSmoothSimple,
                  "Function to smooth triangle mesh with simple neighbour "
@@ -129,7 +127,7 @@ void pybind_trianglemesh(py::module &m) {
                  ":math:`v_o` the output value, and :math:`N` is the set of "
                  "adjacent neighbours.",
                  "number_of_iterations"_a = 1,
-                 "filter_scope"_a = geometry::TriangleMesh::FilterScope::All)
+                 "filter_scope"_a = geometry::MeshBase::FilterScope::All)
             .def("filter_smooth_laplacian",
                  &geometry::TriangleMesh::FilterSmoothLaplacian,
                  "Function to smooth triangle mesh using Laplacian. :math:`v_o "
@@ -140,7 +138,7 @@ void pybind_trianglemesh(py::module &m) {
                  "inverse distance (closer neighbours have higher weight), and "
                  "lambda is the smoothing parameter.",
                  "number_of_iterations"_a = 1, "lambda"_a = 0.5,
-                 "filter_scope"_a = geometry::TriangleMesh::FilterScope::All)
+                 "filter_scope"_a = geometry::MeshBase::FilterScope::All)
             .def("filter_smooth_taubin",
                  &geometry::TriangleMesh::FilterSmoothTaubin,
                  "Function to smooth triangle mesh using method of Taubin, "
@@ -150,7 +148,7 @@ void pybind_trianglemesh(py::module &m) {
                  "parameter mu as smoothing parameter. This method avoids "
                  "shrinkage of the triangle mesh.",
                  "number_of_iterations"_a = 1, "lambda"_a = 0.5, "mu"_a = -0.53,
-                 "filter_scope"_a = geometry::TriangleMesh::FilterScope::All)
+                 "filter_scope"_a = geometry::MeshBase::FilterScope::All)
             .def("has_vertices", &geometry::TriangleMesh::HasVertices,
                  "Returns ``True`` if the mesh contains vertices.")
             .def("has_triangles", &geometry::TriangleMesh::HasTriangles,
@@ -166,6 +164,10 @@ void pybind_trianglemesh(py::module &m) {
             .def("has_adjacency_list",
                  &geometry::TriangleMesh::HasAdjacencyList,
                  "Returns ``True`` if the mesh contains adjacency normals.")
+            .def("has_triangle_uvs", &geometry::TriangleMesh::HasTriangleUvs,
+                 "Returns ``True`` if the mesh contains uv coordinates.")
+            .def("has_texture", &geometry::TriangleMesh::HasTexture,
+                 "Returns ``True`` if the mesh contains a texture image.")
             .def("normalize_normals", &geometry::TriangleMesh::NormalizeNormals,
                  "Normalize both triangle normals and vertex normals to legnth "
                  "1.")
@@ -245,8 +247,8 @@ void pybind_trianglemesh(py::module &m) {
                  &geometry::TriangleMesh::SimplifyVertexClustering,
                  "Function to simplify mesh using vertex clustering.",
                  "voxel_size"_a,
-                 "contraction"_a = geometry::TriangleMesh::
-                         SimplificationContraction::Average)
+                 "contraction"_a =
+                         geometry::MeshBase::SimplificationContraction::Average)
             .def("simplify_quadric_decimation",
                  &geometry::TriangleMesh::SimplifyQuadricDecimation,
                  "Function to simplify mesh using Quadric Error Metric "
@@ -256,6 +258,20 @@ void pybind_trianglemesh(py::module &m) {
             .def("compute_convex_hull",
                  &geometry::TriangleMesh::ComputeConvexHull,
                  "Computes the convex hull of the triangle mesh.")
+            .def_static(
+                    "create_from_point_cloud_ball_pivoting",
+                    &geometry::TriangleMesh::CreateFromPointCloudBallPivoting,
+                    "Function that computes a triangle mesh from a oriented "
+                    "PointCloud. This implements the Ball Pivoting algorithm "
+                    "proposed in F. Bernardini et al., \"The ball-pivoting "
+                    "algorithm for surface reconstruction\", 1999. The "
+                    "implementation is also based on the algorithms outlined "
+                    "in Digne, \"An Analysis and Implementation of a Parallel "
+                    "Ball Pivoting Algorithm\", 2014. The surface "
+                    "reconstruction is done by rolling a ball with a given "
+                    "radius over the point cloud, whenever the ball touches "
+                    "three points a triangle is created.",
+                    "pcd"_a, "radii"_a)
             .def_static("create_box", &geometry::TriangleMesh::CreateBox,
                         "Factory function to create a box. The left bottom "
                         "corner on the "
@@ -350,7 +366,16 @@ void pybind_trianglemesh(py::module &m) {
             .def_readwrite(
                     "adjacency_list", &geometry::TriangleMesh::adjacency_list_,
                     "List of Sets: The set ``adjacency_list[i]`` contains the "
-                    "indices of adjacent vertices of vertex i.");
+                    "indices of adjacent vertices of vertex i.")
+            .def_readwrite("triangle_uvs",
+                           &geometry::TriangleMesh::triangle_uvs_,
+                           "``float64`` array of shape ``(3 * num_triangles, "
+                           "2)``, use "
+                           "``numpy.asarray()`` to access data: List of "
+                           "uvs denoted by the index of points forming "
+                           "the triangle.")
+            .def_readwrite("texture", &geometry::TriangleMesh::texture_,
+                           "open3d.geometry.Image: The texture image.");
     docstring::ClassMethodDocInject(m, "TriangleMesh",
                                     "compute_adjacency_list");
     docstring::ClassMethodDocInject(m, "TriangleMesh",
@@ -363,6 +388,8 @@ void pybind_trianglemesh(py::module &m) {
             {{"normalized",
               "Set to ``True`` to normalize the normal to length 1."}});
     docstring::ClassMethodDocInject(m, "TriangleMesh", "has_triangles");
+    docstring::ClassMethodDocInject(m, "TriangleMesh", "has_triangle_uvs");
+    docstring::ClassMethodDocInject(m, "TriangleMesh", "has_texture");
     docstring::ClassMethodDocInject(m, "TriangleMesh", "has_vertex_colors");
     docstring::ClassMethodDocInject(
             m, "TriangleMesh", "has_vertex_normals",
@@ -409,6 +436,10 @@ void pybind_trianglemesh(py::module &m) {
                                     "remove_degenerate_triangles");
     docstring::ClassMethodDocInject(m, "TriangleMesh",
                                     "remove_non_manifold_edges");
+    docstring::ClassMethodDocInject(
+            m, "TriangleMesh", "merge_close_vertices",
+            {{"eps",
+              "Parameter that defines the distance between close vertices."}});
     docstring::ClassMethodDocInject(
             m, "TriangleMesh", "filter_sharpen",
             {{"number_of_iterations",
@@ -477,6 +508,14 @@ void pybind_trianglemesh(py::module &m) {
               "The number of triangles that the simplified mesh should have. "
               "It is not guranteed that this number will be reached."}});
     docstring::ClassMethodDocInject(m, "TriangleMesh", "compute_convex_hull");
+    docstring::ClassMethodDocInject(
+            m, "TriangleMesh", "create_from_point_cloud_ball_pivoting",
+            {{"pcd",
+              "PointCloud from whicht the TriangleMesh surface is "
+              "reconstructed. Has to contain normals."},
+             {"radii",
+              "The radii of the ball that are used for the surface "
+              "reconstruction."}});
     docstring::ClassMethodDocInject(m, "TriangleMesh", "create_box",
                                     {{"width", "x-directional length."},
                                      {"height", "y-directional length."},

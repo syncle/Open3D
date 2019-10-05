@@ -29,6 +29,7 @@
 
 #include "Open3D/IO/ClassIO/TriangleMeshIO.h"
 #include "Open3D/Utility/Console.h"
+#include "Open3D/Utility/FileSystem.h"
 
 namespace open3d {
 namespace io {
@@ -36,7 +37,7 @@ namespace io {
 bool ReadTriangleMeshFromSTL(const std::string &filename,
                              geometry::TriangleMesh &mesh,
                              bool print_progress) {
-    FILE *myFile = fopen(filename.c_str(), "rb");
+    FILE *myFile = utility::filesystem::FOpen(filename.c_str(), "rb");
 
     if (!myFile) {
         utility::LogWarning("Read STL failed: unable to open file.\n");
@@ -106,7 +107,14 @@ bool WriteTriangleMeshToSTL(const std::string &filename,
                             bool compressed /* = false*/,
                             bool write_vertex_normals /* = true*/,
                             bool write_vertex_colors /* = true*/,
+                            bool write_triangle_uvs /* = true*/,
                             bool print_progress) {
+    if (write_triangle_uvs && mesh.HasTriangleUvs()) {
+        utility::LogWarning(
+                "This file format does not support writing textures and uv "
+                "coordinates. Consider using .obj\n");
+    }
+
     std::ofstream myFile(filename.c_str(), std::ios::out | std::ios::binary);
 
     if (!myFile) {

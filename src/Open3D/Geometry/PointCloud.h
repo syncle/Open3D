@@ -57,8 +57,12 @@ public:
     bool IsEmpty() const override;
     Eigen::Vector3d GetMinBound() const override;
     Eigen::Vector3d GetMaxBound() const override;
+    Eigen::Vector3d GetCenter() const override;
+    AxisAlignedBoundingBox GetAxisAlignedBoundingBox() const override;
+    OrientedBoundingBox GetOrientedBoundingBox() const override;
     PointCloud &Transform(const Eigen::Matrix4d &transformation) override;
-    PointCloud &Translate(const Eigen::Vector3d &translation) override;
+    PointCloud &Translate(const Eigen::Vector3d &translation,
+                          bool relative = true) override;
     PointCloud &Scale(const double scale, bool center = true) override;
     PointCloud &Rotate(const Eigen::Vector3d &rotation,
                        bool center = true,
@@ -86,10 +90,7 @@ public:
 
     /// Assigns each point in the PointCloud the same color \param color.
     PointCloud &PaintUniformColor(const Eigen::Vector3d &color) {
-        colors_.resize(points_.size());
-        for (size_t i = 0; i < points_.size(); i++) {
-            colors_[i] = color;
-        }
+        ResizeAndPaintUniformColor(colors_, points_.size(), color);
         return *this;
     }
 
@@ -183,14 +184,28 @@ public:
     std::vector<double> ComputeNearestNeighborDistance() const;
 
     /// Function that computes the convex hull of the point cloud using qhull
-    std::shared_ptr<TriangleMesh> ComputeConvexHull() const;
+    std::tuple<std::shared_ptr<TriangleMesh>, std::vector<size_t>>
+    ComputeConvexHull() const;
+
+    /// This is an implementation of the Hidden Point Removal operator
+    /// described in Katz et. al. 'Direct Visibility of Point Sets', 2007.
+    /// \param camera_location is the view point that is used to remove
+    /// invisible points. \param radius defines the radius of the spherical
+    /// projection. Additional information about the choice of \param radius
+    /// for noisy point clouds can be found in Mehra et. al. 'Visibility of
+    /// Noisy Point Cloud Data', 2010.
+    std::tuple<std::shared_ptr<TriangleMesh>, std::vector<size_t>>
+    HiddenPointRemoval(const Eigen::Vector3d &camera_location,
+                       const double radius) const;
 
     /// Cluster PointCloud using the DBSCAN algorithm
     /// Ester et al., "A Density-Based Algorithm for Discovering Clusters
     /// in Large Spatial Databases with Noise", 1996
     /// Returns a vector of point labels, -1 indicates noise according to
     /// the algorithm.
-    std::vector<int> ClusterDBSCAN(double eps, size_t min_points) const;
+    std::vector<int> ClusterDBSCAN(double eps,
+                                   size_t min_points,
+                                   bool print_progress = false) const;
 
     /// Factory function to create a pointcloud from a depth image and a camera
     /// model (PointCloudFactory.cpp)

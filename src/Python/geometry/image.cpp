@@ -177,6 +177,10 @@ void pybind_image(py::module &m) {
                      }
                  },
                  "Function to filter Image", "filter_type"_a)
+            .def("flip_vertical", &geometry::Image::FlipVertical,
+                 "Function to flip image vertically (upside down)")
+            .def("flip_horizontal", &geometry::Image::FlipHorizontal,
+                 "Function to flip image horizontally (from left to right)")
             .def("create_pyramid",
                  [](const geometry::Image &input, size_t num_of_levels,
                     bool with_gaussian_filter) {
@@ -211,7 +215,8 @@ void pybind_image(py::module &m) {
     docstring::ClassMethodDocInject(m, "Image", "filter_pyramid",
                                     map_shared_argument_docstrings);
 
-    py::class_<geometry::RGBDImage, std::shared_ptr<geometry::RGBDImage>>
+    py::class_<geometry::RGBDImage, PyGeometry2D<geometry::RGBDImage>,
+               std::shared_ptr<geometry::RGBDImage>, geometry::Geometry2D>
             rgbd_image(m, "RGBDImage",
                        "RGBDImage is for a pair of registered color and depth "
                        "images, viewed from the same view, of the same "

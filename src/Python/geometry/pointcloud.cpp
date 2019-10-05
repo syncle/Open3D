@@ -25,6 +25,7 @@
 // ----------------------------------------------------------------------------
 
 #include "Open3D/Geometry/PointCloud.h"
+#include <vector>
 #include "Open3D/Camera/PinholeCameraIntrinsic.h"
 #include "Open3D/Geometry/Image.h"
 #include "Open3D/Geometry/RGBDImage.h"
@@ -144,12 +145,18 @@ void pybind_pointcloud(py::module &m) {
             .def("compute_convex_hull",
                  &geometry::PointCloud::ComputeConvexHull,
                  "Computes the convex hull of the point cloud.")
+            .def("hidden_point_removal",
+                 &geometry::PointCloud::HiddenPointRemoval,
+                 "Removes hidden points from a point cloud and returns a mesh "
+                 "of the remaining points. Based on Katz et al. 'Direct "
+                 "Visibility of Point Sets', 2007.",
+                 "camera_location"_a, "radius"_a)
             .def("cluster_dbscan", &geometry::PointCloud::ClusterDBSCAN,
                  "Cluster PointCloud using the DBSCAN algorithm  Ester et al., "
                  "'A Density-Based Algorithm for Discovering Clusters in Large "
                  "Spatial Databases with Noise', 1996. Returns a list of point "
                  "labels, -1 indicates noise according to the algorithm.",
-                 "eps"_a, "min_points"_a)
+                 "eps"_a, "min_points"_a, "print_progress"_a = false)
             .def_static(
                     "create_from_depth_image",
                     &geometry::PointCloud::CreateFromDepthImage,
@@ -261,10 +268,18 @@ void pybind_pointcloud(py::module &m) {
     docstring::ClassMethodDocInject(m, "PointCloud", "compute_convex_hull",
                                     {{"input", "The input point cloud."}});
     docstring::ClassMethodDocInject(
+            m, "PointCloud", "hidden_point_removal",
+            {{"input", "The input point cloud."},
+             {"camera_location",
+              "All points not visible from that location will be reomved"},
+             {"radius", "The radius of the sperical projection"}});
+    docstring::ClassMethodDocInject(
             m, "PointCloud", "cluster_dbscan",
             {{"eps",
               "Density parameter that is used to find neighbouring points."},
-             {"min_points", "Minimum number of points to form a cluster."}});
+             {"min_points", "Minimum number of points to form a cluster."},
+             {"print_progress",
+              "If true the progress is visualized in the console."}});
     docstring::ClassMethodDocInject(m, "PointCloud", "create_from_depth_image");
     docstring::ClassMethodDocInject(m, "PointCloud", "create_from_rgbd_image");
 }

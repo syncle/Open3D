@@ -157,12 +157,15 @@ RegistrationResult RegistrationICP(
         utility::LogWarning("Invalid max_correspondence_distance.\n");
         return RegistrationResult(init);
     }
-    if (estimation.GetTransformationEstimationType() ==
-                TransformationEstimationType::PointToPlane &&
+    if ((estimation.GetTransformationEstimationType() ==
+                 TransformationEstimationType::PointToPlane ||
+         estimation.GetTransformationEstimationType() ==
+                 TransformationEstimationType::ColoredICP) &&
         (!source.HasNormals() || !target.HasNormals())) {
         utility::LogWarning(
-                "TransformationEstimationPointToPlane requires "
-                "pre-computed normal vectors.\n");
+                "TransformationEstimationPointToPlane and "
+                "TransformationEstimationColoredICP "
+                "require pre-computed normal vectors.\n");
         return RegistrationResult(init);
     }
 
@@ -389,12 +392,12 @@ Eigen::Matrix6d GetInformationMatrixFromPointClouds(
     // write q^*
     // see http://redwood-data.org/indoor/registration.html
     // note: I comes first in this implementation
-    Eigen::Matrix6d GTG = Eigen::Matrix6d::Identity();
+    Eigen::Matrix6d GTG = Eigen::Matrix6d::Zero();
 #ifdef _OPENMP
 #pragma omp parallel
     {
 #endif
-        Eigen::Matrix6d GTG_private = Eigen::Matrix6d::Identity();
+        Eigen::Matrix6d GTG_private = Eigen::Matrix6d::Zero();
         Eigen::Vector6d G_r_private = Eigen::Vector6d::Zero();
 #ifdef _OPENMP
 #pragma omp for nowait

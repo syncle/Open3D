@@ -203,9 +203,6 @@ TEST(Image, DISABLED_MemberData) {
               int(image.data_.size()));
 }
 
-// ----------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------
 TEST(Image, CreateDepthToCameraDistanceMultiplierFloatImage) {
     camera::PinholeCameraIntrinsic intrinsic = camera::PinholeCameraIntrinsic(
             camera::PinholeCameraIntrinsicParameters::PrimeSenseDefault);
@@ -444,9 +441,6 @@ TEST(Image, CreateFloatImage_3_4_Equal) {
     TEST_CreateFloatImage(3, 4, ref, ConversionType::Equal);
 }
 
-// ----------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------
 TEST(Image, PointerAt) {
     geometry::Image image;
 
@@ -470,9 +464,6 @@ TEST(Image, PointerAt) {
     EXPECT_NEAR(3.0f, *image.PointerAt<float>(1, 1), THRESHOLD_1E_6);
 }
 
-// ----------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------
 TEST(Image, ConvertDepthToFloatImage) {
     // reference data used to validate the creation of the float image
     vector<uint8_t> ref = {
@@ -508,42 +499,152 @@ TEST(Image, ConvertDepthToFloatImage) {
     ExpectEQ(ref, float_image->data_);
 }
 
-// ----------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------
-TEST(Image, FlipImage) {
+TEST(Image, TransposeUint8) {
     // reference data used to validate the creation of the float image
-    vector<uint8_t> ref = {
-            233, 45,  204, 198, 205, 80,  90,  190, 133, 138, 127, 155, 87,
-            84,  248, 228, 162, 170, 40,  149, 207, 33,  38,  200, 202, 69,
-            37,  22,  14,  88,  133, 208, 193, 48,  166, 128, 138, 215, 79,
-            191, 92,  78,  108, 222, 242, 70,  210, 229, 44,  47,  138, 16,
-            0,   0,   0,   0,   82,  224, 121, 11,  74,  130, 236, 211, 171,
-            230, 100, 188, 10,  236, 138, 5,   67,  163, 243, 178, 0,   0,
-            0,   0,   69,  238, 117, 219, 165, 205, 62,  222, 140, 136, 249,
-            145, 118, 162, 118, 230, 110, 1,   179, 227};
+    // clang-format off
+    vector<uint8_t> input = {
+        0,  1,  2,  3,  4,  5,
+        6,  7,  8,  9,  10, 11,
+        12, 13, 14, 15, 16, 17
+    };
+    vector<uint8_t> transposed_ref = {
+        0,  6,  12,
+        1,  7,  13,
+        2,  8,  14,
+        3,  9,  15,
+        4,  10, 16,
+        5,  11, 17
+    };
+    // clang-format on
 
     geometry::Image image;
 
-    // test image dimensions
-    int width = 5;
-    int height = 5;
+    int width = 6;
+    int height = 3;
     int num_of_channels = 1;
-    int bytes_per_channel = 4;
-    int flip_bytes_per_channel = 1;
+    int bytes_per_channel = 1;
 
     image.Prepare(width, height, num_of_channels, bytes_per_channel);
+    image.data_ = input;
 
-    Rand(image.data_, 0, 255, 0);
+    auto transposed_image = image.Transpose();
+    EXPECT_FALSE(transposed_image->IsEmpty());
+    EXPECT_EQ(height, transposed_image->width_);
+    EXPECT_EQ(width, transposed_image->height_);
+    EXPECT_EQ(num_of_channels, transposed_image->num_of_channels_);
+    EXPECT_EQ(int(sizeof(uint8_t)), transposed_image->bytes_per_channel_);
+    ExpectEQ(transposed_ref, transposed_image->data_);
+}
 
-    auto flip_image = image.ConvertDepthToFloatImage();
+TEST(Image, TransposeFloat) {
+    // reference data used to validate the creation of the float image
+    // clang-format off
+    vector<float> input = {
+        0,  1,  2,  3,  4,  5,
+        6,  7,  8,  9,  10, 11,
+        12, 13, 14, 15, 16, 17
+    };
+    vector<float> transposed_ref = {
+        0,  6,  12,
+        1,  7,  13,
+        2,  8,  14,
+        3,  9,  15,
+        4,  10, 16,
+        5,  11, 17
+    };
+    // clang-format on
 
+    geometry::Image image;
+
+    int width = 6;
+    int height = 3;
+    int num_of_channels = 1;
+    int bytes_per_channel = 4;
+
+    image.Prepare(width, height, num_of_channels, bytes_per_channel);
+    std::memcpy(image.data_.data(), input.data(), input.size() * sizeof(float));
+
+    auto transposed_image = image.Transpose();
+    EXPECT_FALSE(transposed_image->IsEmpty());
+    EXPECT_EQ(height, transposed_image->width_);
+    EXPECT_EQ(width, transposed_image->height_);
+    EXPECT_EQ(num_of_channels, transposed_image->num_of_channels_);
+    EXPECT_EQ(int(sizeof(float)), transposed_image->bytes_per_channel_);
+
+    const float* transpose_image_floats =
+            reinterpret_cast<const float*>(transposed_image->data_.data());
+    vector<float> transpose_image_data(
+            transpose_image_floats,
+            transpose_image_floats + transposed_ref.size());
+    ExpectEQ(transposed_ref, transpose_image_data);
+}
+
+TEST(Image, FlipVerticalImage) {
+    // reference data used to validate the creation of the float image
+    // clang-format off
+    vector<uint8_t> input = {
+      0, 1, 2, 3, 4, 5,
+      6, 7, 8, 9, 10, 11,
+      12, 13, 14, 15, 16, 17
+    };
+    vector<uint8_t> flipped = {
+      12, 13, 14, 15, 16, 17,
+      6, 7, 8, 9, 10, 11,
+      0, 1, 2, 3, 4, 5,
+    };
+    // clang-format on
+
+    geometry::Image image;
+    // test image dimensions
+    int width = 6;
+    int height = 3;
+    int num_of_channels = 1;
+    int bytes_per_channel = 1;
+
+    image.Prepare(width, height, num_of_channels, bytes_per_channel);
+    image.data_ = input;
+
+    auto flip_image = image.FlipVertical();
     EXPECT_FALSE(flip_image->IsEmpty());
     EXPECT_EQ(width, flip_image->width_);
     EXPECT_EQ(height, flip_image->height_);
-    EXPECT_EQ(flip_bytes_per_channel, flip_image->num_of_channels_);
-    EXPECT_EQ(int(sizeof(float)), flip_image->bytes_per_channel_);
-    ExpectEQ(ref, flip_image->data_);
+    EXPECT_EQ(num_of_channels, flip_image->num_of_channels_);
+    EXPECT_EQ(int(sizeof(uint8_t)), flip_image->bytes_per_channel_);
+    ExpectEQ(flipped, flip_image->data_);
+}
+
+TEST(Image, FlipHorizontalImage) {
+    // reference data used to validate the creation of the float image
+    // clang-format off
+    vector<uint8_t> input = {
+      0, 1, 2, 3, 4, 5,
+      6, 7, 8, 9, 10, 11,
+      12, 13, 14, 15, 16, 17
+    };
+    vector<uint8_t> flipped = {
+      5, 4, 3, 2, 1, 0,
+      11, 10, 9, 8, 7, 6,
+      17, 16, 15, 14, 13, 12
+    };
+    // clang-format on
+
+    geometry::Image image;
+    // test image dimensions
+    int width = 6;
+    int height = 3;
+    int num_of_channels = 1;
+    int bytes_per_channel = 1;
+
+    image.Prepare(width, height, num_of_channels, bytes_per_channel);
+    image.data_ = input;
+
+    auto flip_image = image.FlipHorizontal();
+    EXPECT_FALSE(flip_image->IsEmpty());
+    EXPECT_EQ(width, flip_image->width_);
+    EXPECT_EQ(height, flip_image->height_);
+    EXPECT_EQ(num_of_channels, flip_image->num_of_channels_);
+    EXPECT_EQ(int(sizeof(uint8_t)), flip_image->bytes_per_channel_);
+    ExpectEQ(flipped, flip_image->data_);
 }
 
 // ----------------------------------------------------------------------------
@@ -578,9 +679,6 @@ void TEST_Filter(const vector<uint8_t>& ref,
     ExpectEQ(ref, output->data_);
 }
 
-// ----------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------
 TEST(Image, Filter_Gaussian3) {
     // reference data used to validate the filtering of an image
     vector<uint8_t> ref = {
@@ -596,9 +694,6 @@ TEST(Image, Filter_Gaussian3) {
     TEST_Filter(ref, FilterType::Gaussian3);
 }
 
-// ----------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------
 TEST(Image, Filter_Gaussian5) {
     // reference data used to validate the filtering of an image
     vector<uint8_t> ref = {
@@ -614,9 +709,6 @@ TEST(Image, Filter_Gaussian5) {
     TEST_Filter(ref, FilterType::Gaussian5);
 }
 
-// ----------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------
 TEST(Image, Filter_Gaussian7) {
     // reference data used to validate the filtering of an image
     vector<uint8_t> ref = {
@@ -632,9 +724,6 @@ TEST(Image, Filter_Gaussian7) {
     TEST_Filter(ref, FilterType::Gaussian7);
 }
 
-// ----------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------
 TEST(Image, Filter_Sobel3Dx) {
     // reference data used to validate the filtering of an image
     vector<uint8_t> ref = {
@@ -650,9 +739,6 @@ TEST(Image, Filter_Sobel3Dx) {
     TEST_Filter(ref, FilterType::Sobel3Dx);
 }
 
-// ----------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------
 TEST(Image, Filter_Sobel3Dy) {
     // reference data used to validate the filtering of an image
     vector<uint8_t> ref = {
@@ -668,9 +754,6 @@ TEST(Image, Filter_Sobel3Dy) {
     TEST_Filter(ref, FilterType::Sobel3Dy);
 }
 
-// ----------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------
 TEST(Image, FilterHorizontal) {
     // reference data used to validate the filtering of an image
     vector<uint8_t> ref = {
@@ -709,9 +792,6 @@ TEST(Image, FilterHorizontal) {
     ExpectEQ(ref, output->data_);
 }
 
-// ----------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------
 TEST(Image, Downsample) {
     // reference data used to validate the filtering of an image
     vector<uint8_t> ref = {172, 41, 59,  204, 93, 130, 242, 232,
@@ -741,9 +821,6 @@ TEST(Image, Downsample) {
     ExpectEQ(ref, output->data_);
 }
 
-// ----------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------
 TEST(Image, Dilate) {
     // reference data used to validate the filtering of an image
     vector<uint8_t> ref = {
@@ -780,9 +857,6 @@ TEST(Image, Dilate) {
     ExpectEQ(ref, output->data_);
 }
 
-// ----------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------
 TEST(Image, LinearTransform) {
     // reference data used to validate the filtering of an image
     vector<uint8_t> ref = {
@@ -819,9 +893,6 @@ TEST(Image, LinearTransform) {
     ExpectEQ(ref, output->data_);
 }
 
-// ----------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------
 TEST(Image, ClipIntensity) {
     // reference data used to validate the filtering of an image
     vector<uint8_t> ref = {
@@ -904,9 +975,6 @@ TEST(Image, CreateImageFromFloatImage_16bit) {
     TEST_CreateImageFromFloatImage<uint16_t>();
 }
 
-// ----------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------
 TEST(Image, FilterPyramid) {
     // reference data used to validate the filtering of an image
     vector<vector<uint8_t>> ref = {
@@ -961,9 +1029,6 @@ TEST(Image, FilterPyramid) {
     }
 }
 
-// ----------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------
 TEST(Image, CreatePyramid) {
     // reference data used to validate the filtering of an image
     vector<vector<uint8_t>> ref = {

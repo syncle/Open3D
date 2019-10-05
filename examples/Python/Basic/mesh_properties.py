@@ -8,6 +8,10 @@ import numpy as np
 import open3d as o3d
 import time
 
+import os
+import sys
+dir_path = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.join(dir_path, '../Misc'))
 import meshes
 
 
@@ -94,9 +98,8 @@ def check_properties(name, mesh):
     if not edge_manifold:
         print('  # Remove non-manifold edges')
         mesh.remove_non_manifold_edges()
-        print(
-            f'  # Is mesh now edge-manifold: {fmt_bool(mesh.is_edge_manifold())}'
-        )
+        print('  # Is mesh now edge-manifold: {}'.format(
+            fmt_bool(mesh.is_edge_manifold())))
         o3d.visualization.draw_geometries([mesh])
 
 

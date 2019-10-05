@@ -1,3 +1,9 @@
+# Configure a header file to pass the version settings to the source code
+configure_file("${PROJECT_SOURCE_DIR}/src/Open3D/Open3D.h.in"
+               "${PROJECT_SOURCE_DIR}/src/Open3D/Open3D.h")
+configure_file("${PROJECT_SOURCE_DIR}/src/Open3D/Open3DConfig.h.in"
+               "${PROJECT_SOURCE_DIR}/src/Open3D/Open3DConfig.h")
+
 # Subdirectories
 add_subdirectory(Camera)
 add_subdirectory(ColorMap)
@@ -43,7 +49,6 @@ add_library(${CMAKE_PROJECT_NAME}
     $<TARGET_OBJECTS:IO>
     $<TARGET_OBJECTS:Visualization>
 )
-
 ShowAndAbortOnWarning(${CMAKE_PROJECT_NAME})
 
 # headless rendering
