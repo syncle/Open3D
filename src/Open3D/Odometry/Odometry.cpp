@@ -62,23 +62,23 @@ inline void AddElementToCorrespondenceMap(geometry::Image &correspondence_map,
                                           int v_s,
                                           int u_t,
                                           int v_t,
-                                          float transformed_d_t) {
+                                          float transformed_d_s) {
     int exist_u_t, exist_v_t;
     double exist_d_t;
     exist_u_t = *correspondence_map.PointerAt<int>(u_s, v_s, 0);
     exist_v_t = *correspondence_map.PointerAt<int>(u_s, v_s, 1);
     if (exist_u_t != -1 && exist_v_t != -1) {
         exist_d_t = *depth_buffer.PointerAt<float>(u_s, v_s);
-        if (transformed_d_t <
+        if (transformed_d_s <
             exist_d_t) {  // update nearer point as correspondence
             *correspondence_map.PointerAt<int>(u_s, v_s, 0) = u_t;
             *correspondence_map.PointerAt<int>(u_s, v_s, 1) = v_t;
-            *depth_buffer.PointerAt<float>(u_s, v_s) = transformed_d_t;
+            *depth_buffer.PointerAt<float>(u_s, v_s) = transformed_d_s;
         }
     } else {  // register correspondence
         *correspondence_map.PointerAt<int>(u_s, v_s, 0) = u_t;
         *correspondence_map.PointerAt<int>(u_s, v_s, 1) = v_t;
-        *depth_buffer.PointerAt<float>(u_s, v_s) = transformed_d_t;
+        *depth_buffer.PointerAt<float>(u_s, v_s) = transformed_d_s;
     }
 }
 
@@ -91,11 +91,11 @@ void MergeCorrespondenceMaps(geometry::Image &correspondence_map,
             int u_t = *correspondence_map_part.PointerAt<int>(u_s, v_s, 0);
             int v_t = *correspondence_map_part.PointerAt<int>(u_s, v_s, 1);
             if (u_t != -1 && v_t != -1) {
-                float transformed_d_t =
+                float transformed_d_s =
                         *depth_buffer_part.PointerAt<float>(u_s, v_s);
                 AddElementToCorrespondenceMap(correspondence_map, depth_buffer,
                                               u_s, v_s, u_t, v_t,
-                                              transformed_d_t);
+                                              transformed_d_s);
             }
         }
     }
@@ -161,7 +161,7 @@ std::shared_ptr<CorrespondenceSetPixelWise> ComputeCorrespondence(
                             AddElementToCorrespondenceMap(
                                     *correspondence_map_private,
                                     *depth_buffer_private, u_s, v_s, u_t, v_t,
-                                    (float)d_s);
+                                    (float)transformed_d_s);
                         }
                     }
                 }
