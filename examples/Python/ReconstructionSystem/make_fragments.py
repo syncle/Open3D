@@ -140,6 +140,7 @@ def make_pointcloud_for_fragment(path_dataset, color_files, depth_files,
     pcd = o3d.geometry.PointCloud()
     pcd.points = mesh.vertices
     pcd.colors = mesh.vertex_colors
+    pcd.normals = mesh.vertex_normals
     pcd_name = join(path_dataset,
                     config["template_fragment_pointcloud"] % fragment_id)
     o3d.io.write_point_cloud(pcd_name, pcd, False, True)
