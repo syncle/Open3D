@@ -14,6 +14,7 @@ def initialize_config(config):
 
     # set default parameters if not specified
     set_default_value(config, "depth_map_type", "redwood")
+    set_default_value(config, "dense_rgbd_matching", True)
     set_default_value(config, "n_frames_per_fragment", 100)
     set_default_value(config, "n_keyframes_per_n_frame", 5)
     set_default_value(config, "min_depth", 0.3)
@@ -27,6 +28,7 @@ def initialize_config(config):
     set_default_value(config, "global_registration", "ransac")
     set_default_value(config, "python_multi_threading", "true")
 
+    # file naming rules
     set_default_value(config, "folder_fragment", "fragments/")
     set_default_value(config, "template_fragment_posegraph",
                       "fragments/fragment_%03d.json")

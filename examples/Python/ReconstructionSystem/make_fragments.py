@@ -59,6 +59,18 @@ def register_one_rgbd_pair(s, t, color_files, depth_files, intrinsic,
         return [success, trans, info]
 
 
+def make_matching_pairs(sid, eid, config):
+    pairs = []
+    if config['dense_rgbd_matching'] == True:
+        for s in range(sid, eid):
+            for t in range(s + 1, eid):
+                pairs.append([s, t])
+    else:
+        for s in range(sid, eid - 1):
+            pairs.append([s, s + 1])
+    return pairs
+
+
 def make_posegraph_for_fragment(path_dataset, sid, eid, color_files,
                                 depth_files, fragment_id, n_fragments,
                                 intrinsic, with_opencv, config):
@@ -66,43 +78,37 @@ def make_posegraph_for_fragment(path_dataset, sid, eid, color_files,
     pose_graph = o3d.registration.PoseGraph()
     trans_odometry = np.identity(4)
     pose_graph.nodes.append(o3d.registration.PoseGraphNode(trans_odometry))
-    for s in range(sid, eid):
-        for t in range(s + 1, eid):
-            # odometry
-            if t == s + 1:
-                print(
-                    "Fragment %03d / %03d :: RGBD matching between frame : %d and %d"
-                    % (fragment_id, n_fragments - 1, s, t))
-                [success, trans,
-                 info] = register_one_rgbd_pair(s, t, color_files, depth_files,
-                                                intrinsic, with_opencv, config)
-                trans_odometry = np.dot(trans, trans_odometry)
-                trans_odometry_inv = np.linalg.inv(trans_odometry)
-                pose_graph.nodes.append(
-                    o3d.registration.PoseGraphNode(trans_odometry_inv))
+    pairs = make_matching_pairs(sid, eid, config)
+    for p in pairs:
+        s = p[0]
+        t = p[1]
+        print("Fragment %03d / %03d :: RGBD matching between frame : %d and %d"
+                % (fragment_id, n_fragments - 1, s, t))
+        [success, trans, info] = register_one_rgbd_pair(s, t, color_files, depth_files,
+                                            intrinsic, with_opencv, config)
+        # odometry
+        if t == s + 1:
+            trans_odometry = np.dot(trans, trans_odometry)
+            trans_odometry_inv = np.linalg.inv(trans_odometry)
+            pose_graph.nodes.append(
+                o3d.registration.PoseGraphNode(trans_odometry_inv))
+            pose_graph.edges.append(
+                o3d.registration.PoseGraphEdge(s - sid,
+                                                t - sid,
+                                                trans,
+                                                info,
+                                                uncertain=False))
+
+        # keyframe loop closure
+        elif s % config['n_keyframes_per_n_frame'] == 0 \
+                and t % config['n_keyframes_per_n_frame'] == 0:
+            if success:
                 pose_graph.edges.append(
                     o3d.registration.PoseGraphEdge(s - sid,
-                                                   t - sid,
-                                                   trans,
-                                                   info,
-                                                   uncertain=False))
-
-            # keyframe loop closure
-            if s % config['n_keyframes_per_n_frame'] == 0 \
-                    and t % config['n_keyframes_per_n_frame'] == 0:
-                print(
-                    "Fragment %03d / %03d :: RGBD matching between frame : %d and %d"
-                    % (fragment_id, n_fragments - 1, s, t))
-                [success, trans,
-                 info] = register_one_rgbd_pair(s, t, color_files, depth_files,
-                                                intrinsic, with_opencv, config)
-                if success:
-                    pose_graph.edges.append(
-                        o3d.registration.PoseGraphEdge(s - sid,
-                                                       t - sid,
-                                                       trans,
-                                                       info,
-                                                       uncertain=True))
+                                                    t - sid,
+                                                    trans,
+                                                    info,
+                                                    uncertain=True))
     o3d.io.write_pose_graph(
         join(path_dataset, config["template_fragment_posegraph"] % fragment_id),
         pose_graph)
