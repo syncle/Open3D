@@ -31,6 +31,7 @@ def test_single_pair(s, t, color_files, depth_files, intrinsic, with_opencv,
         source_rgbd_image, intrinsic)
     target = o3d.geometry.PointCloud.create_from_rgbd_image(
         target_rgbd_image, intrinsic)
+    source.transform(trans)
     draw_geometries_flip([source, target])
 
 
