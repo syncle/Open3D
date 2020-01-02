@@ -28,6 +28,11 @@ def read_rgbd_image(color_file, depth_file, convert_rgb_to_intensity, config):
         depth,
         depth_trunc=config["max_depth"],
         convert_rgb_to_intensity=convert_rgb_to_intensity)
+    # pcd = o3d.geometry.PointCloud.create_from_rgbd_image(
+    #     rgbd_image,
+    #     o3d.camera.PinholeCameraIntrinsic(
+    #         o3d.camera.PinholeCameraIntrinsicParameters.PrimeSenseDefault))
+    # o3d.visualization.draw_geometries([pcd])
     return rgbd_image
 
 
@@ -40,7 +45,14 @@ def register_one_rgbd_pair(s, t, color_files, depth_files, intrinsic,
 
     option = o3d.odometry.OdometryOption()
     option.max_depth_diff = config["max_depth_diff"]
-    if abs(s - t) is not 1:
+    option.iteration_number_per_pyramid_level = o3d.utility.IntVector([40,20,10])
+    if t == s + 1:
+        odo_init = np.identity(4)
+        [success, trans, info] = o3d.odometry.compute_rgbd_odometry(
+            source_rgbd_image, target_rgbd_image, intrinsic, odo_init,
+            o3d.odometry.RGBDOdometryJacobianFromHybridTerm(), option)
+        return [success, trans, info]
+    else:
         if with_opencv:
             success_5pt, odo_init = pose_estimation(source_rgbd_image,
                                                     target_rgbd_image,
@@ -51,12 +63,6 @@ def register_one_rgbd_pair(s, t, color_files, depth_files, intrinsic,
                     o3d.odometry.RGBDOdometryJacobianFromHybridTerm(), option)
                 return [success, trans, info]
         return [False, np.identity(4), np.identity(6)]
-    else:
-        odo_init = np.identity(4)
-        [success, trans, info] = o3d.odometry.compute_rgbd_odometry(
-            source_rgbd_image, target_rgbd_image, intrinsic, odo_init,
-            o3d.odometry.RGBDOdometryJacobianFromHybridTerm(), option)
-        return [success, trans, info]
 
 
 def make_matching_pairs(sid, eid, config):
@@ -64,7 +70,11 @@ def make_matching_pairs(sid, eid, config):
     if config['dense_rgbd_matching'] == True:
         for s in range(sid, eid):
             for t in range(s + 1, eid):
-                pairs.append([s, t])
+                if t == s + 1:
+                    pairs.append([s, t])
+                elif s % config['n_keyframes_per_n_frame'] == 0 \
+                    and t % config['n_keyframes_per_n_frame'] == 0:
+                    pairs.append([s, t])
     else:
         for s in range(sid, eid - 1):
             pairs.append([s, s + 1])
@@ -98,10 +108,8 @@ def make_posegraph_for_fragment(path_dataset, sid, eid, color_files,
                                                 trans,
                                                 info,
                                                 uncertain=False))
-
         # keyframe loop closure
-        elif s % config['n_keyframes_per_n_frame'] == 0 \
-                and t % config['n_keyframes_per_n_frame'] == 0:
+        else:
             if success:
                 pose_graph.edges.append(
                     o3d.registration.PoseGraphEdge(s - sid,
