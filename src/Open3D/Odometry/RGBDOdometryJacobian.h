@@ -100,11 +100,33 @@ public:
             const CorrespondenceSetPixelWise &corresps) const override;
 };
 
+/// Class to compute Jacobian using depth term
+/// Energy: (D_p-(D_q)')^2
+class RGBDOdometryJacobianFromDepthTerm : public RGBDOdometryJacobian {
+public:
+    RGBDOdometryJacobianFromDepthTerm() {}
+    ~RGBDOdometryJacobianFromDepthTerm() override {}
+
+public:
+    void ComputeJacobianAndResidual(
+            int row,
+            std::vector<Eigen::Vector6d, utility::Vector6d_allocator> &J_r,
+            std::vector<double> &r,
+            const geometry::RGBDImage &source,
+            const geometry::RGBDImage &target,
+            const geometry::Image &source_xyz,
+            const geometry::RGBDImage &target_dx,
+            const geometry::RGBDImage &target_dy,
+            const Eigen::Matrix3d &intrinsic,
+            const Eigen::Matrix4d &extrinsic,
+            const CorrespondenceSetPixelWise &corresps) const override;
+};
+
 /// Class to compute Jacobian using hybrid term
 /// Energy: (I_p-I_q)^2 + lambda(D_p-(D_q)')^2
 /// reference:
 /// J. Park, Q.-Y. Zhou, and V. Koltun
-/// anonymous submission
+/// ICCV 2017
 class RGBDOdometryJacobianFromHybridTerm : public RGBDOdometryJacobian {
 public:
     RGBDOdometryJacobianFromHybridTerm() {}

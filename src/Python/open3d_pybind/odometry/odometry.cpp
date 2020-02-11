@@ -154,6 +154,25 @@ In ICCV Workshops, 2011.)");
                 return std::string("RGBDOdometryJacobianFromColorTerm");
             });
 
+    // open3d.odometry.RGBDOdometryJacobianFromDepthTerm: RGBDOdometryJacobian
+    py::class_<
+            odometry::RGBDOdometryJacobianFromDepthTerm,
+            PyRGBDOdometryJacobian<odometry::RGBDOdometryJacobianFromDepthTerm>,
+            odometry::RGBDOdometryJacobian>
+            jacobian_depth(m, "RGBDOdometryJacobianFromDepthTerm",
+                           R"(Class to Compute Jacobian using color term.
+
+Energy: :math:`(D_p-D_q)^2.`)");
+    py::detail::bind_default_constructor<
+            odometry::RGBDOdometryJacobianFromDepthTerm>(jacobian_depth);
+    py::detail::bind_copy_functions<
+            odometry::RGBDOdometryJacobianFromDepthTerm>(jacobian_depth);
+    jacobian_depth.def(
+            "__repr__",
+            [](const odometry::RGBDOdometryJacobianFromDepthTerm &te) {
+                return std::string("RGBDOdometryJacobianFromDepthTerm");
+            });
+
     // open3d.odometry.RGBDOdometryJacobianFromHybridTerm: RGBDOdometryJacobian
     py::class_<odometry::RGBDOdometryJacobianFromHybridTerm,
                PyRGBDOdometryJacobian<

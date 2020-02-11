@@ -83,6 +83,55 @@ void RGBDOdometryJacobianFromColorTerm::ComputeJacobianAndResidual(
     r[0] = diff;
 }
 
+void RGBDOdometryJacobianFromDepthTerm::ComputeJacobianAndResidual(
+        int row,
+        std::vector<Eigen::Vector6d, utility::Vector6d_allocator> &J_r,
+        std::vector<double> &r,
+        const geometry::RGBDImage &source,
+        const geometry::RGBDImage &target,
+        const geometry::Image &source_xyz,
+        const geometry::RGBDImage &target_dx,
+        const geometry::RGBDImage &target_dy,
+        const Eigen::Matrix3d &intrinsic,
+        const Eigen::Matrix4d &extrinsic,
+        const CorrespondenceSetPixelWise &corresps) const {
+    
+    const double fx = intrinsic(0, 0);
+    const double fy = intrinsic(1, 1);
+    Eigen::Matrix3d R = extrinsic.block<3, 3>(0, 0);
+    Eigen::Vector3d t = extrinsic.block<3, 1>(0, 3);
+
+    int u_s = corresps[row](0);
+    int v_s = corresps[row](1);
+    int u_t = corresps[row](2);
+    int v_t = corresps[row](3);
+    double dDdx = SOBEL_SCALE * (*target_dx.depth_.PointerAt<float>(u_t, v_t));
+    double dDdy = SOBEL_SCALE * (*target_dy.depth_.PointerAt<float>(u_t, v_t));
+    if (std::isnan(dDdx)) dDdx = 0;
+    if (std::isnan(dDdy)) dDdy = 0;
+    Eigen::Vector3d p3d_mat(*source_xyz.PointerAt<float>(u_s, v_s, 0),
+                            *source_xyz.PointerAt<float>(u_s, v_s, 1),
+                            *source_xyz.PointerAt<float>(u_s, v_s, 2));
+    Eigen::Vector3d p3d_trans = R * p3d_mat + t;
+
+    double diff_geo = *target.depth_.PointerAt<float>(u_t, v_t) - p3d_trans(2);
+    double invz = 1. / p3d_trans(2);
+    double d0 = dDdx * fx * invz;
+    double d1 = dDdy * fy * invz;
+    double d2 = -(d0 * p3d_trans(0) + d1 * p3d_trans(1)) * invz;
+
+    J_r.resize(1);
+    r.resize(1);
+    J_r[0](0) = (-p3d_trans(2) * d1 + p3d_trans(1) * d2) - p3d_trans(1);
+    J_r[0](1) = (p3d_trans(2) * d0 - p3d_trans(0) * d2) + p3d_trans(0);
+    J_r[0](2) = (-p3d_trans(1) * d0 + p3d_trans(0) * d1);
+    J_r[0](3) = d0;
+    J_r[0](4) = d1;
+    J_r[0](5) = d2 - 1.0f;
+    double r_geo = diff_geo;
+    r[0] = r_geo;
+}
+
 void RGBDOdometryJacobianFromHybridTerm::ComputeJacobianAndResidual(
         int row,
         std::vector<Eigen::Vector6d, utility::Vector6d_allocator> &J_r,
