@@ -2,6 +2,7 @@
     "name": "Open3D reconstruction tutorial http://open3d.org/docs/release/tutorial/ReconstructionSystem/system_overview.html",
     "path_dataset": "dataset/tutorial/",
     "path_intrinsic": "",
+    "dense_rgbd_matching": false,
     "max_depth": 3.0,
     "voxel_size": 0.05,
     "max_depth_diff": 0.07,

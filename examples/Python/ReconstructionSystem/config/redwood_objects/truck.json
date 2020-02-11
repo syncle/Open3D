@@ -2,6 +2,7 @@
     "name": "Single object scans http://redwood-data.org/3dscan/index.html",
     "path_dataset": "dataset/redwood_objects/truck/",
     "path_intrinsic": "",
+    "dense_rgbd_matching": false,
     "max_depth": 3.0,
     "voxel_size": 0.05,
     "max_depth_diff": 0.07,
